@@ -27,6 +27,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --release --verbose
       - name: Run tests
         run: cargo test --verbose
+      - name: Store binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: camden-server
+          path: target/release/camden
+      - name: webhook
+        uses: distributhor/workflow-webhook@v2
+        env:
+          webhook_url: "${{ secrets.FETCHER_URL }}"
+          webhook_secret: "${{ secrets.FETCHER_SECRET }}"
+          webhook_type: json
+          data: '{"run_id": ${{ github.run_id }}}'
