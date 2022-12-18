@@ -1,0 +1,25 @@
+[package]
+name = "camden"
+version = "0.2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive", "default"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json", "stream"] }
+tokio = { version = "1", features = ["full"] }
+rstar = { version = "0.9.3", features = ["serde", "debug"] }
+geojson = "0.24.0"
+chrono = { version = "0.4.22", features = ["serde"] }
+log = { version = "0.4.17", features = ["serde"] }
+simplelog = "0.12.0"
+rocket = { version = "0.5.0-rc.2", features = ["json"] }
+uuid = { version = "1.2.2", features = ["v4"] }
+lazy_static = "1.4.0"
+regex = "1.7.0"
+csv = "1.1.6"
+toml = "0.5.10"
+duration-str = "0.5.0"
+mongodb = "2.3.1"
