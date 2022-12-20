@@ -97,13 +97,15 @@ impl Manager {
   pub async fn get_firs(&self, env: &AABB<Point>) -> Vec<FIR> {
     let firs2d = self.firs2d.read().await;
     let fixed = self.fixed.read().await;
-    let mut firs = vec![];
+    let mut firs = HashMap::new();
 
     for po in firs2d.locate_in_envelope_intersecting(env) {
       let fir_list = fixed.find_firs(&po.id);
-      firs.extend(fir_list.iter().cloned());
+      for fir in fir_list {
+        firs.insert(fir.icao.clone(), fir);
+      }
     }
-    firs
+    firs.into_values().collect()
   }
 
   pub async fn find_airport(&self, code: &str) -> Option<Airport> {
