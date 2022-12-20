@@ -75,3 +75,31 @@ impl PartialEq for RectObject {
     self.id == other.id
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use rstar::RTree;
+
+  #[test]
+  fn test_intersection() {
+    let mut tree = RTree::new();
+    let obj = RectObject {
+      id: "1".into(),
+      rect: Rect {
+        south_west: Point { lat: 1.0, lng: 1.0 },
+        north_east: Point { lat: 3.0, lng: 3.0 },
+      },
+    };
+    tree.insert(obj.clone());
+
+    let env = AABB::from_corners(Point { lat: 0.0, lng: 0.0 }, Point { lat: 2.0, lng: 2.0 });
+
+    let objs = tree
+      .locate_in_envelope_intersecting(&env)
+      .collect::<Vec<_>>();
+    assert_eq!(objs.len(), 1);
+    let objs = tree.locate_in_envelope(&env).collect::<Vec<_>>();
+    assert_eq!(objs.len(), 0);
+  }
+}
