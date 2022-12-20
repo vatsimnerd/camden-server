@@ -116,7 +116,7 @@ impl FixedData {
 
   pub fn set_airport_controller(&mut self, ctrl: Controller) {
     let mut ctrl = ctrl;
-    let tokens: Vec<&str> = ctrl.callsign.split("_").collect();
+    let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
     let idx = self.find_airport_idx(code);
     if let Some(idx) = idx {
@@ -153,7 +153,7 @@ impl FixedData {
   }
 
   pub fn reset_airport_controller(&mut self, ctrl: &Controller) {
-    let tokens: Vec<&str> = ctrl.callsign.split("_").collect();
+    let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
     let idx = self.find_airport_idx(code);
     if let Some(idx) = idx {
@@ -182,7 +182,7 @@ impl FixedData {
   }
 
   pub fn set_fir_controller(&mut self, ctrl: Controller) {
-    let tokens: Vec<&str> = ctrl.callsign.split("_").collect();
+    let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
     let country = self
       .country_idx
@@ -212,7 +212,7 @@ impl FixedData {
   }
 
   pub fn reset_fir_controller(&mut self, ctrl: &Controller) {
-    let tokens: Vec<&str> = ctrl.callsign.split("_").collect();
+    let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
     let fir_ids = self.find_fir_indices(code);
     for idx in fir_ids {
@@ -224,11 +224,11 @@ impl FixedData {
   }
 
   fn find_fir_idx_by_icao(&self, query: &str) -> Option<usize> {
-    self.firs_icao_idx.get(query).map(|idx| idx.clone())
+    self.firs_icao_idx.get(query).copied()
   }
 
   fn find_fir_idx_by_prefix(&self, query: &str) -> Option<usize> {
-    self.firs_prefix_idx.get(query).map(|idx| idx.clone())
+    self.firs_prefix_idx.get(query).copied()
   }
 
   fn find_fir_indices(&self, query: &str) -> Vec<usize> {
@@ -251,10 +251,7 @@ impl FixedData {
       }
     }
 
-    let uir = self
-      .uirs_idx
-      .get(query)
-      .and_then(|idx| Some(&self.uirs[*idx]));
+    let uir = self.uirs_idx.get(query).map(|idx| &self.uirs[*idx]);
 
     if let Some(uir) = uir {
       let mut idcs = vec![];
@@ -284,7 +281,7 @@ impl FixedData {
     self
       .country_idx
       .get(prefix)
-      .and_then(|idx| Some(self.countries[*idx].clone()))
+      .map(|idx| self.countries[*idx].clone())
   }
 
   pub fn find_airport_idx(&self, code: &str) -> Option<usize> {
@@ -294,11 +291,7 @@ impl FixedData {
       Some(*idx)
     } else {
       let indices = self.arpt_icao_idx.get(code);
-      if let Some(indices) = indices {
-        Some(indices[0])
-      } else {
-        None
-      }
+      indices.map(|indices| indices[0])
     }
   }
 

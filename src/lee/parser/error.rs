@@ -42,12 +42,7 @@ impl Display for ParseError {
         )
       }
       ParseError::ConvertError(t, err) => {
-        write!(
-          f,
-          "error while converting {}: {}",
-          t.kind.to_string(),
-          err.to_string()
-        )
+        write!(f, "error while converting {}: {}", t.kind, err)
       }
       ParseError::InvalidValueType(t, exp) => {
         write!(

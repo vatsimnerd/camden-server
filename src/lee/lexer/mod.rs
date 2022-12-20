@@ -35,7 +35,7 @@ impl<'a> Lexer<'a> {
     loop {
       let sym = self.src.peek();
       if let Some(sym) = sym {
-        if sym >= '0' && sym <= '9' {
+        if ('0'..='9').contains(&sym) {
           literal.push(sym);
         } else if sym == '.' {
           if !dot_met {
@@ -257,7 +257,8 @@ impl<'a> Lexer<'a> {
     self.src.advance();
 
     loop {
-      let sym = self.src.next();
+      let sym = self.src.peek();
+      self.src.advance();
       if let Some(sym) = sym {
         match sym {
           '\n' | '\t' | '\r' => {
@@ -308,7 +309,7 @@ impl<'a> Lexer<'a> {
       let sym = self.src.peek();
       if let Some(sym) = sym {
         let s = String::from(sym);
-        let token = if sym >= '0' && sym <= '9' {
+        let token = if ('0'..='9').contains(&sym) {
           self.read_number()
         } else if IDENT_START.is_match(&s) {
           self.read_identifier()

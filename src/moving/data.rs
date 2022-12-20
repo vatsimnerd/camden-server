@@ -15,9 +15,9 @@ pub struct General {
 
 impl From<super::exttypes::General> for General {
   fn from(src: super::exttypes::General) -> Self {
-    let updated_at = DateTime::parse_from_rfc3339(&&src.update_timestamp)
-      .and_then(|dt| Ok(dt.with_timezone(&Utc)))
-      .unwrap_or(Utc::now());
+    let updated_at = DateTime::parse_from_rfc3339(&src.update_timestamp)
+      .map(|dt| dt.with_timezone(&Utc))
+      .unwrap_or_else(|_| Utc::now());
     Self {
       version: src.version,
       reload: src.reload,

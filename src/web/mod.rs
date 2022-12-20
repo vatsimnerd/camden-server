@@ -13,7 +13,7 @@ use self::{
 use crate::{
   fixed::types::Airport,
   lee::{make_expr, parser::expression::CompileFunc},
-  manager::manager::Manager,
+  manager::Manager,
   moving::pilot::Pilot,
   seconds_since,
   types::Point,
@@ -135,10 +135,7 @@ pub async fn updates(
 
 #[get("/airports/<code>")]
 pub async fn get_airport(code: String, manager: &State<Arc<Manager>>) -> Option<Json<Airport>> {
-  manager
-    .find_airport(&code)
-    .await
-    .map(|arpt| Json(arpt.clone()))
+  manager.find_airport(&code).await.map(Json)
 }
 
 #[get("/pilots/<callsign>")]

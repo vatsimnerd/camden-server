@@ -4,8 +4,9 @@ extern crate rocket;
 use camden::config::read_config;
 use camden::web::error::{catch404, catch500};
 use camden::web::{check_query, get_pilot, updates};
-use camden::{manager::manager::Manager, web::get_airport};
+use camden::{manager::Manager, web::get_airport};
 use log::error;
+use rocket::config::Config as RocketConfig;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::sync::Arc;
 
@@ -35,7 +36,9 @@ async fn rocket() -> _ {
     });
   }
 
-  rocket::build()
+  let figment = RocketConfig::figment().merge(("port", config.web.port));
+
+  rocket::custom(figment)
     .manage(m)
     .mount(
       "/api",

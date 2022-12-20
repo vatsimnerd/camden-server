@@ -93,7 +93,7 @@ impl Default for Track {
   }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct Config {
   pub log: Log,
   pub web: Web,
@@ -101,19 +101,6 @@ pub struct Config {
   pub fixed: Fixed,
   pub track: Track,
   pub cache: Cache,
-}
-
-impl Default for Config {
-  fn default() -> Self {
-    Self {
-      log: Default::default(),
-      web: Default::default(),
-      api: Default::default(),
-      fixed: Default::default(),
-      track: Default::default(),
-      cache: Default::default(),
-    }
-  }
 }
 
 pub fn read_config(filename: Option<&str>) -> Config {

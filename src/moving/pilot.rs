@@ -77,15 +77,15 @@ impl Pilot {
 impl From<crate::moving::exttypes::Pilot> for Pilot {
   fn from(src: crate::moving::exttypes::Pilot) -> Self {
     let qnh_i_hg = (src.qnh_i_hg * 100.0).round() as u16;
-
+    let now = Utc::now();
     let logon_time = DateTime::parse_from_rfc3339(&src.logon_time)
-      .and_then(|dt| Ok(dt.with_timezone(&Utc)))
-      .unwrap_or(Utc::now());
+      .map(|dt| dt.with_timezone(&Utc))
+      .unwrap_or(now);
     let last_updated = DateTime::parse_from_rfc3339(&src.last_updated)
-      .and_then(|dt| Ok(dt.with_timezone(&Utc)))
-      .unwrap_or(Utc::now());
+      .map(|dt| dt.with_timezone(&Utc))
+      .unwrap_or(now);
 
-    let flight_plan = src.flight_plan.and_then(|fp| Some(fp.into()));
+    let flight_plan = src.flight_plan.map(|fp| fp.into());
 
     Self {
       cid: src.cid,

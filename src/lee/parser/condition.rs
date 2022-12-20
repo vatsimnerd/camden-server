@@ -174,7 +174,7 @@ impl<T> Condition<T> {
     )
   }
 
-  pub fn compile(&mut self, cb: &Box<CompileFunc<T>>) -> Result<(), CompileError> {
+  pub fn compile(&mut self, cb: &CompileFunc<T>) -> Result<(), CompileError> {
     let evalfunc = cb(self.part_clone())?;
     self.callback = Some(evalfunc);
     Ok(())

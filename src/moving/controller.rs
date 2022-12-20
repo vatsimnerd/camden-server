@@ -103,12 +103,14 @@ impl From<super::exttypes::Controller> for Controller {
     } else {
       "".to_owned()
     };
+    let now = Utc::now();
+
     let logon_time = DateTime::parse_from_rfc3339(&ctrl.logon_time)
-      .and_then(|dt| Ok(dt.with_timezone(&Utc)))
-      .unwrap_or(Utc::now());
+      .map(|dt| dt.with_timezone(&Utc))
+      .unwrap_or(now);
     let last_updated = DateTime::parse_from_rfc3339(&ctrl.last_updated)
-      .and_then(|dt| Ok(dt.with_timezone(&Utc)))
-      .unwrap_or(Utc::now());
+      .map(|dt| dt.with_timezone(&Utc))
+      .unwrap_or(now);
 
     Self {
       cid: ctrl.cid,
@@ -119,7 +121,7 @@ impl From<super::exttypes::Controller> for Controller {
       rating: ctrl.rating,
       server: ctrl.server,
       visual_range: ctrl.visual_range,
-      atis_code: ctrl.atis_code.unwrap_or("".to_owned()),
+      atis_code: ctrl.atis_code.unwrap_or_else(|| "".to_owned()),
       text_atis,
       last_updated,
       logon_time,

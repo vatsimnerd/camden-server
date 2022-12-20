@@ -5,7 +5,7 @@ use crate::{
 use std::collections::{HashMap, HashSet};
 
 pub fn calc_pilots(
-  pilots: &Vec<Pilot>,
+  pilots: &[Pilot],
   prev: &mut HashMap<String, Pilot>,
 ) -> (Vec<Pilot>, Vec<Pilot>) {
   let mut pilots_set = vec![];
@@ -37,7 +37,7 @@ pub fn calc_pilots(
 }
 
 pub fn calc_airports(
-  airports: &Vec<Airport>,
+  airports: &[Airport],
   prev: &mut HashMap<String, Airport>,
 ) -> (Vec<Airport>, Vec<Airport>) {
   let mut arpts_set = vec![];
@@ -69,7 +69,7 @@ pub fn calc_airports(
   (arpts_set, arpts_delete)
 }
 
-pub fn calc_firs(firs: &Vec<FIR>, prev: &mut HashMap<String, FIR>) -> (Vec<FIR>, Vec<FIR>) {
+pub fn calc_firs(firs: &[FIR], prev: &mut HashMap<String, FIR>) -> (Vec<FIR>, Vec<FIR>) {
   let mut firs_set = vec![];
   let mut firs_delete = vec![];
   let mut keys = HashSet::new();

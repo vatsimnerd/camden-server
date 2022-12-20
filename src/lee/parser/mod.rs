@@ -172,10 +172,7 @@ fn parse_expression<T>(tf: &mut TokenFlow) -> Result<Expression<T>, ParseError> 
     };
     let operator = tf
       .current()
-      .filter(|token| match token.kind {
-        TokenKind::And | TokenKind::Or => true,
-        _ => false,
-      })
+      .filter(|token| matches!(token.kind, TokenKind::And | TokenKind::Or))
       .map(|token| match token.kind {
         TokenKind::And => CombineOperator::And,
         TokenKind::Or => CombineOperator::Or,

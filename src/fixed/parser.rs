@@ -41,11 +41,11 @@ fn parse(
 
   for line in src.lines() {
     let line = line.trim();
-    if line.is_empty() || line.starts_with(";") {
+    if line.is_empty() || line.starts_with(';') {
       continue;
     }
 
-    if line.starts_with("[") {
+    if line.starts_with('[') {
       let section = &line[1..line.len() - 1];
       match section {
         "Countries" => state = ParserState::ReadCountries,
@@ -59,7 +59,7 @@ fn parse(
       match state {
         ParserState::Idle => error!("unexpected line \"{}\" while parser is idle", line),
         ParserState::ReadCountries => {
-          let tokens: Vec<&str> = line.split("|").collect();
+          let tokens: Vec<&str> = line.split('|').collect();
           if tokens.len() != 3 {
             error!("invalid country line \"{}\"", line)
           } else {
@@ -76,12 +76,12 @@ fn parse(
           }
         }
         ParserState::ReadAirports => {
-          let tokens: Vec<&str> = line.split("|").collect();
+          let tokens: Vec<&str> = line.split('|').collect();
           if tokens.len() != 7 {
             error!("invalid airport line \"{}\"", line)
           } else {
             let lat = tokens[2].parse::<f64>();
-            if let Err(_) = lat {
+            if lat.is_err() {
               error!(
                 "can't parse latitude \"{}\" for airport {}",
                 tokens[2], tokens[0]
@@ -89,7 +89,7 @@ fn parse(
               continue;
             }
             let lng = tokens[3].parse::<f64>();
-            if let Err(_) = lng {
+            if lng.is_err() {
               error!(
                 "can't parse longitude \"{}\" for airport {}",
                 tokens[3], tokens[0]
@@ -124,7 +124,7 @@ fn parse(
           }
         }
         ParserState::ReadFIRs => {
-          let tokens: Vec<&str> = line.split("|").collect();
+          let tokens: Vec<&str> = line.split('|').collect();
           if tokens.len() != 4 {
             error!("invalid fir line \"{}\"", line)
           } else {
@@ -156,11 +156,11 @@ fn parse(
           }
         }
         ParserState::ReadUIRs => {
-          let tokens: Vec<&str> = line.split("|").collect();
+          let tokens: Vec<&str> = line.split('|').collect();
           if tokens.len() != 3 {
             error!("invalid uir line \"{}\"", line)
           } else {
-            let fir_ids = tokens[2].split(",").map(|t| t.into()).collect();
+            let fir_ids = tokens[2].split(',').map(|t| t.into()).collect();
             let uir = UIR {
               icao: tokens[0].into(),
               name: tokens[1].into(),
@@ -179,7 +179,7 @@ fn parse(
 pub async fn load_fixed(cfg: &Config) -> Result<FixedData, Box<dyn Error>> {
   let boundaries = load_boundaries(&cfg.fixed.boundaries_url).await?;
   let text = reqwest::get(&cfg.fixed.data_url).await?.text().await?;
-  let runways = load_runways(&cfg).await?;
+  let runways = load_runways(cfg).await?;
   let data = parse(&text, boundaries, runways)?;
   Ok(data)
 }

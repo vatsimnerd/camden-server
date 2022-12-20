@@ -24,12 +24,6 @@ impl<'a> StringReader<'a> {
     self.curr
   }
 
-  pub fn next(&mut self) -> Option<char> {
-    let res = self.curr;
-    self.advance();
-    res
-  }
-
   pub fn advance(&mut self) {
     if let Some(sym) = self.curr {
       if sym == '\n' {
@@ -56,14 +50,17 @@ pub mod tests {
     let mut s = StringReader::new("hello");
     assert!(s.peek() == Some('h'));
     assert!(s.peek() == Some('h'));
-    assert!(s.next() == Some('h'));
+    s.advance();
     assert!(s.peek() == Some('e'));
-    assert!(s.next() == Some('e'));
-    assert!(s.next() == Some('l'));
-    assert!(s.next() == Some('l'));
-    assert!(s.next() == Some('o'));
+    s.advance();
+    assert!(s.peek() == Some('l'));
+    s.advance();
+    assert!(s.peek() == Some('l'));
+    s.advance();
+    assert!(s.peek() == Some('o'));
+    s.advance();
     assert!(s.peek() == None);
-    assert!(s.next() == None);
-    assert!(s.next() == None);
+    s.advance();
+    assert!(s.peek() == None);
   }
 }

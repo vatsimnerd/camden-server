@@ -24,7 +24,7 @@ pub struct Expression<T> {
 }
 
 impl<T> Expression<T> {
-  pub fn compile(&mut self, cb: &Box<CompileFunc<T>>) -> Result<(), CompileError> {
+  pub fn compile(&mut self, cb: &CompileFunc<T>) -> Result<(), CompileError> {
     match self.left.as_mut() {
       LeftExpression::Condition(c) => {
         c.compile(cb)?;

@@ -148,7 +148,7 @@ pub async fn load_runways(cfg: &Config) -> Result<HashMap<String, Vec<Runway>>, 
     let t = Utc::now();
     let data = reqwest::get(&cfg.fixed.runways_url).await?.text().await?;
     let mut cache_file = File::create(path)?;
-    cache_file.write(data.as_bytes())?;
+    cache_file.write_all(data.as_bytes())?;
     info!(
       "runways loaded in {}s and stored to cache",
       seconds_since(t)
