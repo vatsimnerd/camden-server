@@ -101,7 +101,7 @@ impl Manager {
 
     for po in firs2d.locate_in_envelope_intersecting(env) {
       let fir_list = fixed.find_firs(&po.id);
-      for fir in fir_list {
+      for fir in fir_list.into_iter().filter(|f| !f.is_empty()) {
         firs.insert(fir.icao.clone(), fir);
       }
     }

@@ -70,6 +70,12 @@ pub struct FIR {
   pub controllers: HashMap<String, Controller>,
 }
 
+impl FIR {
+  pub fn is_empty(&self) -> bool {
+    self.controllers.len() == 0
+  }
+}
+
 #[derive(Debug, Clone)]
 pub struct UIR {
   pub icao: String,
