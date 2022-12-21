@@ -5,10 +5,12 @@ use camden::config::read_config;
 use camden::web::error::{catch404, catch500};
 use camden::web::{check_query, get_pilot, updates};
 use camden::{manager::Manager, web::get_airport};
-use log::error;
+use log::{error, info};
 use rocket::config::Config as RocketConfig;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::sync::Arc;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[launch]
 async fn rocket() -> _ {
@@ -23,6 +25,7 @@ async fn rocket() -> _ {
   )
   .unwrap();
 
+  info!("starting camden server version {}", VERSION);
   let m = Manager::new(config.clone()).await;
   let m = Arc::new(m);
 

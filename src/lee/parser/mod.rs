@@ -10,16 +10,18 @@ pub mod error;
 pub mod expression;
 
 fn parse_operator(tf: &mut TokenFlow) -> Result<Operator, ParseError> {
-  let token = tf.current().ok_or(ParseError::UnexpectedEOS(vec![
-    TokenKind::Equals,
-    TokenKind::NotEquals,
-    TokenKind::Matches,
-    TokenKind::NotMatches,
-    TokenKind::Less,
-    TokenKind::Greater,
-    TokenKind::LessOrEqual,
-    TokenKind::GreaterOrEqual,
-  ]))?;
+  let token = tf.current().ok_or_else(|| {
+    ParseError::UnexpectedEOS(vec![
+      TokenKind::Equals,
+      TokenKind::NotEquals,
+      TokenKind::Matches,
+      TokenKind::NotMatches,
+      TokenKind::Less,
+      TokenKind::Greater,
+      TokenKind::LessOrEqual,
+      TokenKind::GreaterOrEqual,
+    ])
+  })?;
 
   let operator = match token.kind {
     TokenKind::Equals => Operator::Equals,
@@ -51,11 +53,13 @@ fn parse_operator(tf: &mut TokenFlow) -> Result<Operator, ParseError> {
 }
 
 fn parse_value(tf: &mut TokenFlow) -> Result<Value, ParseError> {
-  let token = tf.current().ok_or(ParseError::UnexpectedEOS(vec![
-    TokenKind::Integer,
-    TokenKind::Float,
-    TokenKind::String,
-  ]))?;
+  let token = tf.current().ok_or_else(|| {
+    ParseError::UnexpectedEOS(vec![
+      TokenKind::Integer,
+      TokenKind::Float,
+      TokenKind::String,
+    ])
+  })?;
 
   let value = match token.kind {
     TokenKind::Integer => {
@@ -88,7 +92,7 @@ fn parse_value(tf: &mut TokenFlow) -> Result<Value, ParseError> {
 fn parse_condition<T>(tf: &mut TokenFlow) -> Result<Condition<T>, ParseError> {
   let token = tf
     .current()
-    .ok_or(ParseError::UnexpectedEOS(vec![TokenKind::Ident]))?;
+    .ok_or_else(|| ParseError::UnexpectedEOS(vec![TokenKind::Ident]))?;
   let ident = match token.kind {
     TokenKind::Ident => token.src.clone(),
     _ => {
@@ -148,7 +152,7 @@ fn parse_expression<T>(tf: &mut TokenFlow) -> Result<Expression<T>, ParseError> 
         let exp = parse_expression(tf)?;
         let token = tf
           .current()
-          .ok_or(ParseError::UnexpectedEOS(vec![TokenKind::RightBrace]))?;
+          .ok_or_else(|| ParseError::UnexpectedEOS(vec![TokenKind::RightBrace]))?;
         if token.kind == TokenKind::RightBrace {
           tf.advance();
           LeftExpression::Expression(exp)

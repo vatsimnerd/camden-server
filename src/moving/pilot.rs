@@ -3,6 +3,8 @@ use serde::Serialize;
 
 use crate::types::Point;
 
+use super::aircraft::{guess_aircraft_types, Aircraft};
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Pilot {
   pub cid: u32,
@@ -20,6 +22,7 @@ pub struct Pilot {
   pub flight_plan: Option<FlightPlan>,
   pub logon_time: DateTime<Utc>,
   pub last_updated: DateTime<Utc>,
+  pub aircraft_type: Option<Vec<&'static Aircraft>>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -85,7 +88,12 @@ impl From<crate::moving::exttypes::Pilot> for Pilot {
       .map(|dt| dt.with_timezone(&Utc))
       .unwrap_or(now);
 
-    let flight_plan = src.flight_plan.map(|fp| fp.into());
+    let flight_plan: Option<FlightPlan> = src.flight_plan.map(|fp| fp.into());
+    let aircraft_type = if let Some(fp) = &flight_plan {
+      guess_aircraft_types(&fp.aircraft)
+    } else {
+      None
+    };
 
     Self {
       cid: src.cid,
@@ -106,6 +114,7 @@ impl From<crate::moving::exttypes::Pilot> for Pilot {
       flight_plan,
       logon_time,
       last_updated,
+      aircraft_type,
     }
   }
 }

@@ -1,10 +1,8 @@
+use super::types::Boundaries;
+use crate::types::Point;
 use geojson::{Feature, FeatureCollection, GeoJson};
 use log::error;
 use std::{collections::HashMap, error::Error};
-
-use crate::types::Point;
-
-use super::types::Boundaries;
 
 fn lng_less(a: f64, b: f64) -> bool {
   let d1 = (b - a).rem_euclid(360.0);

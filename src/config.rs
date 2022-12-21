@@ -4,6 +4,19 @@ use serde::Deserialize;
 use std::{fs::File, io::Read, path::Path, time::Duration};
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct Camden {
+  pub map_win_multiplier: f64,
+}
+
+impl Default for Camden {
+  fn default() -> Self {
+    Self {
+      map_win_multiplier: 1.3,
+    }
+  }
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Cache {
   pub runways: String,
 }
@@ -101,6 +114,7 @@ pub struct Config {
   pub fixed: Fixed,
   pub track: Track,
   pub cache: Cache,
+  pub camden: Camden,
 }
 
 pub fn read_config(filename: Option<&str>) -> Config {

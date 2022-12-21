@@ -1,3 +1,4 @@
+pub mod aircraft;
 pub mod controller;
 pub mod data;
 mod exttypes;

@@ -64,6 +64,10 @@ impl Manager {
     }
   }
 
+  pub fn config(&self) -> &Config {
+    &self.cfg
+  }
+
   pub async fn get_pilots(&self, env: &AABB<Point>) -> Vec<Pilot> {
     let pilots2d = self.pilots2d.read().await;
     let pilots_idx = self.pilots.read().await;

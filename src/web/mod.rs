@@ -16,7 +16,7 @@ use crate::{
   manager::Manager,
   moving::pilot::Pilot,
   seconds_since,
-  types::Point,
+  types::{Point, Rect},
 };
 use chrono::Utc;
 use log::{debug, info};
@@ -26,7 +26,6 @@ use rocket::{
   serde::json::Json,
   Shutdown, State,
 };
-use rstar::AABB;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{select, time::interval};
 use uuid::Uuid;
@@ -49,16 +48,19 @@ pub async fn updates(
   );
   let mut tm = interval(Duration::from_secs(5));
 
-  let env = AABB::from_corners(
-    Point {
+  let rect = Rect {
+    south_west: Point {
       lat: min_lat,
       lng: min_lng,
     },
-    Point {
+    north_east: Point {
       lat: max_lat,
       lng: max_lng,
     },
-  );
+  };
+  let env = rect
+    .scale(manager.config().camden.map_win_multiplier)
+    .envelope();
 
   let mut pilots_state = HashMap::new();
   let mut airports_state = HashMap::new();

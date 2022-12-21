@@ -2,7 +2,10 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::{
-  moving::pilot::{FlightPlan, Pilot},
+  moving::{
+    aircraft::Aircraft,
+    pilot::{FlightPlan, Pilot},
+  },
   track::TrackPoint,
   types::Point,
 };
@@ -25,6 +28,7 @@ pub struct PilotApiResponse {
   pub logon_time: DateTime<Utc>,
   pub last_updated: DateTime<Utc>,
   pub track: Option<Vec<TrackPoint>>,
+  pub aircraft_type: Option<Vec<&'static Aircraft>>,
 }
 
 impl From<Pilot> for PilotApiResponse {
@@ -46,6 +50,7 @@ impl From<Pilot> for PilotApiResponse {
       logon_time: p.logon_time,
       last_updated: p.last_updated,
       track: None,
+      aircraft_type: p.aircraft_type,
     }
   }
 }
