@@ -8,13 +8,17 @@ use crate::{
     parser::load_fixed,
     types::{Airport, FIR},
   },
-  moving::{controller::Facility, load_vatsim_data, pilot::Pilot},
+  moving::{
+    controller::{Controller, Facility},
+    load_vatsim_data,
+    pilot::Pilot,
+  },
   seconds_since,
   track::{TrackPoint, TrackStore},
   types::Point,
 };
 use chrono::Utc;
-use log::{debug, error, info};
+use log::{error, info};
 use rstar::{RTree, AABB};
 use std::collections::{HashMap, HashSet};
 use tokio::{sync::RwLock, time::sleep};
@@ -145,7 +149,7 @@ impl Manager {
     self.setup_fixed_data().await?;
 
     let mut pilots_callsigns = HashSet::new();
-    let mut controllers = HashMap::new();
+    let mut controllers: HashMap<String, Controller> = HashMap::new();
     let mut data_updated_at = 0;
     loop {
       info!("loading vatsim data");
@@ -196,7 +200,6 @@ impl Manager {
 
           // for each callsign not met this iteration let's remove it from the indexes
           for cs in pilots_callsigns.difference(&fresh_pilots_callsigns) {
-            debug!("pilot {} left vatsim", cs);
             self.remove_pilot(cs).await;
           }
 
@@ -230,7 +233,12 @@ impl Manager {
 
           for (cs, ctrl) in controllers.iter() {
             if !fresh_controllers.contains_key(cs) {
-              self.fixed.write().await.reset_fir_controller(ctrl)
+              match ctrl.facility {
+                Facility::Radar => self.fixed.write().await.reset_fir_controller(ctrl),
+                _ => {
+                  self.fixed.write().await.reset_airport_controller(ctrl);
+                }
+              }
             }
           }
           controllers = fresh_controllers;
