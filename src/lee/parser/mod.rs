@@ -89,7 +89,7 @@ fn parse_value(tf: &mut TokenFlow) -> Result<Value, ParseError> {
   Ok(value)
 }
 
-fn parse_condition<T>(tf: &mut TokenFlow) -> Result<Condition<T>, ParseError> {
+fn parse_condition(tf: &mut TokenFlow) -> Result<Condition, ParseError> {
   let token = tf
     .current()
     .ok_or_else(|| ParseError::UnexpectedEOS(vec![TokenKind::Ident]))?;
@@ -139,7 +139,6 @@ fn parse_condition<T>(tf: &mut TokenFlow) -> Result<Condition<T>, ParseError> {
     ident,
     operator,
     value,
-    callback: None,
   })
 }
 
@@ -226,10 +225,10 @@ pub fn parse<T>(tf: &mut TokenFlow) -> Result<Expression<T>, ParseError> {
 #[cfg(test)]
 mod tests {
 
-  use super::expression::CompileFunc;
   use super::*;
   use crate::lee::lexer::Lexer;
-  use crate::lee::parser::expression::EvaluateFunc;
+  use crate::lee::parser::error::CompileError;
+  use crate::lee::parser::expression::{CompileFunc, EvaluateFunc};
 
   struct Model {
     x: i64,
@@ -246,12 +245,18 @@ mod tests {
     assert!(exp.is_ok());
     let mut exp = exp.unwrap();
     let cb: Box<CompileFunc<Model>> = Box::new(|cond| {
-      let evalfunc: Box<EvaluateFunc<Model>> = Box::new(move |model| match cond.ident.as_str() {
-        "x" => cond.eval_i64(model.x),
-        "y" => cond.eval_i64(model.y),
-        "callsign" => cond.eval_str(&model.callsign),
-        _ => true,
-      });
+      let evalfunc: Box<EvaluateFunc<Model>> = match cond.ident.as_str() {
+        "x" => Box::new(move |model| cond.value.eval_i64(model.x, cond.operator.clone())),
+        "y" => Box::new(move |model| cond.value.eval_i64(model.y, cond.operator.clone())),
+        "callsign" => {
+          Box::new(move |model| cond.value.eval_str(&model.callsign, cond.operator.clone()))
+        }
+        _ => {
+          return Err(CompileError {
+            msg: "failed to compile, invalid identifier met".into(),
+          })
+        }
+      };
       Ok(evalfunc)
     });
     let res = exp.compile(&cb);
@@ -263,6 +268,7 @@ mod tests {
       callsign: "AER384".into(),
     });
     assert!(res);
+
     let res = exp.evaluate(&Model {
       x: 3,
       y: 5,
