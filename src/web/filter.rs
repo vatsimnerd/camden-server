@@ -7,10 +7,9 @@ use crate::{
   moving::pilot::Pilot,
 };
 use lazy_static::lazy_static;
-use std::collections::HashSet;
 
 lazy_static! {
-  static ref ALLOWED_FIELDS: HashSet<&'static str> = HashSet::from([
+  static ref ALLOWED_FIELDS: &'static [&'static str] = &[
     "callsign",
     "name",
     "alt",
@@ -21,8 +20,7 @@ lazy_static! {
     "arrival",
     "departure",
     "rules",
-  ]);
-  static ref FIELDS_LIST: Vec<&'static str> = ALLOWED_FIELDS.iter().cloned().collect();
+  ];
 }
 
 // Compilation callback
@@ -94,7 +92,7 @@ pub fn compile_filter(cond: Condition) -> Result<Box<EvaluateFunc<Pilot>>, Compi
         msg: format!(
           "{} is not a valid field to query, valid fields are: [{}]",
           cond.ident,
-          FIELDS_LIST.join(", ")
+          ALLOWED_FIELDS.join(", ")
         ),
       })
     }
