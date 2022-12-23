@@ -1,9 +1,5 @@
-use super::{
-  error::CompileError,
-  expression::{CompileFunc, EvaluateFunc},
-};
 use regex::Regex;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 #[derive(Debug, Clone)]
 pub enum Operator {
@@ -55,18 +51,10 @@ impl Value {
       Value::String(v) => format!("string({})", v),
     }
   }
-}
 
-pub struct PartCondition {
-  pub ident: String,
-  pub operator: Operator,
-  pub value: Value,
-}
-
-impl PartCondition {
-  pub fn eval_i64(&self, ext_val: i64) -> bool {
-    match self.value {
-      Value::Integer(v) => match self.operator {
+  pub fn eval_i64(&self, ext_val: i64, operator: Operator) -> bool {
+    match *self {
+      Value::Integer(v) => match operator {
         Operator::Equals => ext_val == v,
         Operator::NotEquals => ext_val != v,
         Operator::Less => ext_val < v,
@@ -77,7 +65,7 @@ impl PartCondition {
       },
       Value::Float(v) => {
         let ext_val = ext_val as f64;
-        match self.operator {
+        match operator {
           Operator::Equals => ext_val == v,
           Operator::NotEquals => ext_val != v,
           Operator::Less => ext_val < v,
@@ -91,11 +79,11 @@ impl PartCondition {
     }
   }
 
-  pub fn eval_f64(&self, ext_val: f64) -> bool {
-    match self.value {
+  pub fn eval_f64(&self, ext_val: f64, operator: Operator) -> bool {
+    match *self {
       Value::Integer(v) => {
         let v = v as f64;
-        match self.operator {
+        match operator {
           Operator::Equals => ext_val == v,
           Operator::NotEquals => ext_val != v,
           Operator::Less => ext_val < v,
@@ -105,7 +93,7 @@ impl PartCondition {
           _ => false,
         }
       }
-      Value::Float(v) => match self.operator {
+      Value::Float(v) => match operator {
         Operator::Equals => ext_val == v,
         Operator::NotEquals => ext_val != v,
         Operator::Less => ext_val < v,
@@ -118,11 +106,11 @@ impl PartCondition {
     }
   }
 
-  pub fn eval_str(&self, ext_val: &str) -> bool {
-    match &self.value {
+  pub fn eval_str(&self, ext_val: &str, operator: Operator) -> bool {
+    match self {
       Value::Integer(_) => false,
       Value::Float(_) => false,
-      Value::String(v) => match self.operator {
+      Value::String(v) => match operator {
         Operator::Matches => {
           let re = Regex::from_str(v);
           if let Ok(re) = re {
@@ -146,53 +134,23 @@ impl PartCondition {
       },
     }
   }
-
-  pub fn repr(&self) -> String {
-    format!(
-      "PartCondition<({} {} {})>",
-      self.ident,
-      self.operator.literal(),
-      self.value.as_string()
-    )
-  }
 }
 
-pub struct Condition<T> {
+#[derive(Clone)]
+pub struct Condition {
   pub ident: String,
   pub operator: Operator,
   pub value: Value,
-  pub callback: Option<Box<EvaluateFunc<T>>>,
 }
 
-impl<T> Condition<T> {
-  pub fn repr(&self) -> String {
-    format!(
+impl Display for Condition {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
       "Condition<({} {} {})>",
       self.ident,
       self.operator.literal(),
       self.value.as_string()
     )
-  }
-
-  pub fn compile(&mut self, cb: &CompileFunc<T>) -> Result<(), CompileError> {
-    let evalfunc = cb(self.part_clone())?;
-    self.callback = Some(evalfunc);
-    Ok(())
-  }
-
-  pub fn evaluate(&self, model: &T) -> bool {
-    if let Some(cb) = &self.callback {
-      cb(model)
-    } else {
-      false
-    }
-  }
-
-  pub fn part_clone(&self) -> PartCondition {
-    PartCondition {
-      ident: self.ident.clone(),
-      operator: self.operator.clone(),
-      value: self.value.clone(),
-    }
   }
 }
