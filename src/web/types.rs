@@ -28,7 +28,7 @@ pub struct PilotApiResponse {
   pub logon_time: DateTime<Utc>,
   pub last_updated: DateTime<Utc>,
   pub track: Option<Vec<TrackPoint>>,
-  pub aircraft_type: Option<Vec<&'static Aircraft>>,
+  pub aircraft_type: Option<&'static Aircraft>,
 }
 
 impl From<Pilot> for PilotApiResponse {

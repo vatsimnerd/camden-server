@@ -22,7 +22,7 @@ pub struct Pilot {
   pub flight_plan: Option<FlightPlan>,
   pub logon_time: DateTime<Utc>,
   pub last_updated: DateTime<Utc>,
-  pub aircraft_type: Option<Vec<&'static Aircraft>>,
+  pub aircraft_type: Option<&'static Aircraft>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

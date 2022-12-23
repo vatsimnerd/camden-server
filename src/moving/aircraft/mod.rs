@@ -37,7 +37,7 @@ pub struct Aircraft {
 }
 
 lazy_static! {
-  static ref DB: HashMap<&'static str, Vec<&'static Aircraft>> = {
+  static ref DB: HashMap<&'static str, &'static Aircraft> = {
     let mut db: HashMap<&'static str, Vec<&'static Aircraft>> = HashMap::new();
     for atype in data::MODELS {
       let ex = db.get_mut(atype.designator);
@@ -47,19 +47,43 @@ lazy_static! {
         db.insert(atype.designator, vec![atype]);
       }
     }
-    db
+    db.into_iter()
+      .map(|(key, options)| (key, pick_best_at(&options)))
+      .collect()
   };
 }
 
-pub fn guess_aircraft_types(code: &str) -> Option<Vec<&'static Aircraft>> {
+fn pick_best_at(options: &Vec<&'static Aircraft>) -> &'static Aircraft {
+  if options.len() == 1 {
+    options[0]
+  } else {
+    // TODO
+    options[0]
+  }
+}
+
+pub fn guess_aircraft_types(code: &str) -> Option<&'static Aircraft> {
   let mut l = code.len().clamp(0, 4);
   while l > 0 {
     let partial_code = &code[..l];
-    let atypes = DB.get(partial_code);
-    if atypes.is_some() {
-      return atypes.cloned();
+    let atype = DB.get(partial_code);
+    if let Some(atype) = atype {
+      return Some(*atype);
     }
     l -= 1;
   }
   None
+}
+
+#[cfg(test)]
+pub mod tests {
+  use super::guess_aircraft_types;
+
+  #[test]
+  fn test_atype() {
+    let atype = guess_aircraft_types("B738");
+    assert!(atype.is_some());
+    let atype = atype.unwrap();
+    assert_eq!(atype.name, "737-800");
+  }
 }
