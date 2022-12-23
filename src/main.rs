@@ -3,7 +3,7 @@ extern crate rocket;
 
 use camden::config::read_config;
 use camden::web::error::{catch404, catch500};
-use camden::web::{check_query, get_pilot, updates};
+use camden::web::{build_info, check_query, get_pilot, updates};
 use camden::{manager::Manager, web::get_airport};
 use log::{error, info};
 use rocket::config::Config as RocketConfig;
@@ -45,7 +45,7 @@ async fn rocket() -> _ {
     .manage(m)
     .mount(
       "/api",
-      routes![updates, get_airport, get_pilot, check_query],
+      routes![updates, get_airport, get_pilot, check_query, build_info],
     )
     .register("/", catchers![catch404, catch500])
 }

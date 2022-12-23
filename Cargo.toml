@@ -1,7 +1,9 @@
 [package]
 name = "camden"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
+repository = "https://github.com/vatsimnerd/camden-server"
+license-file = "https://github.com/vatsimnerd/camden-server/blob/main/LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

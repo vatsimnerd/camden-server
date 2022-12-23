@@ -26,6 +26,7 @@ use rocket::{
   serde::json::Json,
   Shutdown, State,
 };
+use serde::Serialize;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{select, time::interval};
 use uuid::Uuid;
@@ -162,4 +163,26 @@ pub async fn check_query(query: String) -> Result<Json<QueryCheckOkResponse>, AP
   let cb: Box<CompileFunc<Pilot>> = Box::new(compile_filter);
   expr.compile(&cb)?;
   Ok(Json(QueryCheckOkResponse { status: "ok" }))
+}
+
+#[derive(Serialize)]
+pub struct BuildInfo {
+  name: String,
+  version: String,
+  repository: String,
+  license: String,
+}
+
+#[get("/__build__")]
+pub async fn build_info() -> Json<BuildInfo> {
+  let pkgname = env!("CARGO_PKG_NAME").to_owned();
+  let pkgversion = env!("CARGO_PKG_VERSION").to_owned();
+  let repository = env!("CARGO_PKG_REPOSITORY").to_owned();
+  let license_file = env!("CARGO_PKG_LICENSE_FILE").to_owned();
+  Json(BuildInfo {
+    name: pkgname,
+    version: pkgversion,
+    repository,
+    license: license_file,
+  })
 }
