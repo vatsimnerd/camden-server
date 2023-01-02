@@ -52,9 +52,13 @@ lazy_static! {
 }
 
 pub fn guess_aircraft_types(code: &str) -> Option<Vec<&'static Aircraft>> {
-  let mut l = code.len().clamp(0, 4);
+  // pff unicode is tough
+  let mut indices: Vec<usize> = code.char_indices().map(|(i, _)| i).collect();
+  indices.push(code.len());
+  let mut l = indices.len().clamp(0, 5);
+
   while l > 0 {
-    let partial_code = &code[..l];
+    let partial_code = &code[..indices[l]];
     let atypes = DB.get(partial_code);
     if atypes.is_some() {
       return atypes.cloned();
