@@ -66,9 +66,13 @@ impl Manager {
       }
 
       info!("cleaning up tracks");
+      let t = Utc::now();
       let res = tracks.cleanup().await;
       if let Err(err) = res {
         error!("error cleaning up: {}", err);
+      } else {
+        let process_time = seconds_since(t);
+        info!("boot-time db cleanup took {process_time}s");
       }
     }
 
@@ -306,7 +310,7 @@ impl Manager {
               Err(err) => error!("error cleaning up db: {err}"),
               Ok(_) => {
                 let process_time = seconds_since(t);
-                info!("db cleanup took {process_time} secs");
+                info!("db cleanup took {process_time}s");
                 cleanup = CLEANUP_EVERY_X_ITER;
               }
             }
