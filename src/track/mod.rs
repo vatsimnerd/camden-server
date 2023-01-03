@@ -1,4 +1,6 @@
 use crate::{config::Config, moving::pilot::Pilot};
+use chrono::{Duration, Utc};
+use log::{error, info};
 use mongodb::{
   bson::{doc, oid::ObjectId, DateTime},
   options::{ClientOptions, FindOptions},
@@ -80,6 +82,52 @@ impl TrackStore {
       )
       .await?;
     Ok(())
+  }
+
+  pub async fn cleanup(&self) -> Result<(), mongodb::error::Error> {
+    let coll: Collection<Track> = self.db.collection(Track::collection());
+    let dt = Utc::now() - Duration::days(2);
+    let dt = DateTime::from_chrono(dt);
+    let query = doc! {
+      "created_at": doc! {
+        "$lt": dt
+      }
+    };
+    let mut cur = coll.find(query, None).await?;
+    let mut count = 0;
+    let mut tp_count = 0;
+    while let Some(track) = cur.try_next().await? {
+      let res = self.drop_track(&track).await;
+      match res {
+        Err(err) => error!("error dropping track: {err}"),
+        Ok(cnt) => {
+          count += 1;
+          tp_count += cnt;
+        }
+      }
+    }
+    info!("{count} tracks and {tp_count} track points dropped");
+    Ok(())
+  }
+
+  pub async fn counters(&self) -> Result<(u64, u64), mongodb::error::Error> {
+    let coll: Collection<TrackPoint> = self.db.collection(TrackPoint::collection());
+    let tp_count = coll.count_documents(doc! {}, None).await?;
+    let coll: Collection<Track> = self.db.collection(Track::collection());
+    let t_count = coll.count_documents(doc! {}, None).await?;
+    Ok((t_count, tp_count))
+  }
+
+  pub async fn drop_track(&self, track: &Track) -> Result<u64, mongodb::error::Error> {
+    let coll: Collection<TrackPoint> = self.db.collection(TrackPoint::collection());
+    let query = doc! {"track_id": track._id.unwrap() };
+    let del_res = coll.delete_many(query, None).await?;
+    let tp_count = del_res.deleted_count;
+
+    let coll: Collection<Track> = self.db.collection(Track::collection());
+    let query = doc! {"_id": track._id.unwrap() };
+    coll.delete_one(query, None).await?;
+    Ok(tp_count)
   }
 
   pub async fn store(&self, pilot: &Pilot) -> Result<(), mongodb::error::Error> {

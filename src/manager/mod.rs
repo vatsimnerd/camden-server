@@ -1,6 +1,10 @@
+pub mod metrics;
 pub mod spatial;
 
-use self::spatial::{PointObject, RectObject};
+use self::{
+  metrics::Metrics,
+  spatial::{PointObject, RectObject},
+};
 use crate::{
   config::Config,
   fixed::{
@@ -18,10 +22,12 @@ use crate::{
   types::Point,
 };
 use chrono::Utc;
-use log::{error, info};
+use log::{debug, error, info};
 use rstar::{RTree, AABB};
 use std::collections::{HashMap, HashSet};
 use tokio::{sync::RwLock, time::sleep};
+
+const CLEANUP_EVERY_X_ITER: u8 = 5;
 
 #[derive(Debug)]
 pub struct Manager {
@@ -34,6 +40,8 @@ pub struct Manager {
   airports2d: RwLock<RTree<PointObject>>,
   firs2d: RwLock<RTree<RectObject>>,
   tracks: Option<RwLock<TrackStore>>,
+
+  metrics: RwLock<Metrics>,
 }
 
 impl Manager {
@@ -50,9 +58,21 @@ impl Manager {
 
     if let Some(tracks) = &tracks {
       info!("creating track indices");
-      let res = tracks.write().await.indexes().await;
+      let tracks = tracks.write().await;
+
+      let res = tracks.indexes().await;
       if let Err(err) = res {
-        error!("error creating track indices: {}", err)
+        error!("error creating track indices: {}", err);
+      }
+
+      info!("cleaning up tracks");
+      let t = Utc::now();
+      let res = tracks.cleanup().await;
+      if let Err(err) = res {
+        error!("error cleaning up: {}", err);
+      } else {
+        let process_time = seconds_since(t);
+        info!("boot-time db cleanup took {process_time}s");
       }
     }
 
@@ -65,11 +85,16 @@ impl Manager {
       airports2d: RwLock::new(RTree::new()),
       firs2d: RwLock::new(RTree::new()),
       tracks,
+      metrics: RwLock::new(Metrics::new()),
     }
   }
 
   pub fn config(&self) -> &Config {
     &self.cfg
+  }
+
+  pub async fn render_metrics(&self) -> String {
+    self.metrics.read().await.render()
   }
 
   pub async fn get_pilots(&self, env: &AABB<Point>) -> Vec<Pilot> {
@@ -151,15 +176,20 @@ impl Manager {
     let mut pilots_callsigns = HashSet::new();
     let mut controllers: HashMap<String, Controller> = HashMap::new();
     let mut data_updated_at = 0;
+    let mut cleanup = CLEANUP_EVERY_X_ITER;
+
     loop {
       info!("loading vatsim data");
       let t = Utc::now();
       let data = load_vatsim_data(&self.cfg).await;
-      info!("vatsim data loaded in {}s", seconds_since(t));
+      let process_time = seconds_since(t);
+      self.metrics.write().await.vatsim_data_load_time_sec = process_time;
+      info!("vatsim data loaded in {}s", process_time);
       if let Some(data) = data {
         let ts = data.general.updated_at.timestamp();
         if ts > data_updated_at {
           data_updated_at = ts;
+          self.metrics.write().await.vatsim_data_timestamp = ts;
           // region:pilots_processing
           let mut fresh_pilots_callsigns = HashSet::new();
 
@@ -206,7 +236,13 @@ impl Manager {
           // setup this iteration as "previous"
           pilots_callsigns = fresh_pilots_callsigns;
 
-          info!("{} pilots processed in {}s", pcount, seconds_since(t));
+          let process_time = seconds_since(t);
+          {
+            let mut metrics = self.metrics.write().await;
+            metrics.pilots_processing_time_sec = process_time;
+            metrics.pilots_online = pilots_callsigns.len();
+          }
+          info!("{} pilots processed in {}s", pcount, process_time);
           // endregion:pilots_processing
 
           // region:controllers_processing
@@ -243,9 +279,46 @@ impl Manager {
           }
           controllers = fresh_controllers;
 
-          info!("{} controllers processed in {}s", ccount, seconds_since(t));
+          let process_time = seconds_since(t);
+          {
+            let mut metrics = self.metrics.write().await;
+            metrics.controllers_processing_time_sec = process_time;
+            metrics.controllers_online = controllers.len();
+          }
+          info!("{} controllers processed in {}s", ccount, process_time);
           // endregion:controllers_processing
         }
+
+        if let Some(tracks) = &self.tracks {
+          let res = tracks.read().await.counters().await;
+          match res {
+            Ok((tc, tpc)) => {
+              let mut metrics = self.metrics.write().await;
+              metrics.track_count = tc;
+              metrics.track_point_count = tpc;
+            }
+            Err(err) => {
+              error!("error getting db counters: {err}");
+            }
+          }
+
+          cleanup -= 1;
+          if cleanup == 0 {
+            let t = Utc::now();
+            let res = tracks.write().await.cleanup().await;
+            match res {
+              Err(err) => error!("error cleaning up db: {err}"),
+              Ok(_) => {
+                let process_time = seconds_since(t);
+                info!("db cleanup took {process_time}s");
+                cleanup = CLEANUP_EVERY_X_ITER;
+              }
+            }
+          } else {
+            debug!("{cleanup} iterations to db cleanup");
+          }
+        }
+
         sleep(self.cfg.api.poll_period).await;
       }
     }
