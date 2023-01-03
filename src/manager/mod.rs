@@ -1,6 +1,10 @@
+pub mod metrics;
 pub mod spatial;
 
-use self::spatial::{PointObject, RectObject};
+use self::{
+  metrics::Metrics,
+  spatial::{PointObject, RectObject},
+};
 use crate::{
   config::Config,
   fixed::{
@@ -34,6 +38,8 @@ pub struct Manager {
   airports2d: RwLock<RTree<PointObject>>,
   firs2d: RwLock<RTree<RectObject>>,
   tracks: Option<RwLock<TrackStore>>,
+
+  metrics: RwLock<Metrics>,
 }
 
 impl Manager {
@@ -50,9 +56,17 @@ impl Manager {
 
     if let Some(tracks) = &tracks {
       info!("creating track indices");
-      let res = tracks.write().await.indexes().await;
+      let tracks = tracks.write().await;
+
+      let res = tracks.indexes().await;
       if let Err(err) = res {
-        error!("error creating track indices: {}", err)
+        error!("error creating track indices: {}", err);
+      }
+
+      info!("cleaning up tracks");
+      let res = tracks.cleanup().await;
+      if let Err(err) = res {
+        error!("error cleaning up: {}", err);
       }
     }
 
@@ -65,6 +79,7 @@ impl Manager {
       airports2d: RwLock::new(RTree::new()),
       firs2d: RwLock::new(RTree::new()),
       tracks,
+      metrics: RwLock::new(Metrics::new()),
     }
   }
 
@@ -155,11 +170,14 @@ impl Manager {
       info!("loading vatsim data");
       let t = Utc::now();
       let data = load_vatsim_data(&self.cfg).await;
-      info!("vatsim data loaded in {}s", seconds_since(t));
+      let process_time = seconds_since(t);
+      self.metrics.write().await.vatsim_data_load_time_sec = process_time;
+      info!("vatsim data loaded in {}s", process_time);
       if let Some(data) = data {
         let ts = data.general.updated_at.timestamp();
         if ts > data_updated_at {
           data_updated_at = ts;
+          self.metrics.write().await.vatsim_data_timestamp = ts;
           // region:pilots_processing
           let mut fresh_pilots_callsigns = HashSet::new();
 
@@ -206,7 +224,13 @@ impl Manager {
           // setup this iteration as "previous"
           pilots_callsigns = fresh_pilots_callsigns;
 
-          info!("{} pilots processed in {}s", pcount, seconds_since(t));
+          let process_time = seconds_since(t);
+          {
+            let mut metrics = self.metrics.write().await;
+            metrics.pilots_processing_time_sec = process_time;
+            metrics.pilots_online = pilots_callsigns.len();
+          }
+          info!("{} pilots processed in {}s", pcount, process_time);
           // endregion:pilots_processing
 
           // region:controllers_processing
@@ -243,7 +267,13 @@ impl Manager {
           }
           controllers = fresh_controllers;
 
-          info!("{} controllers processed in {}s", ccount, seconds_since(t));
+          let process_time = seconds_since(t);
+          {
+            let mut metrics = self.metrics.write().await;
+            metrics.controllers_processing_time_sec = process_time;
+            metrics.controllers_online = controllers.len();
+          }
+          info!("{} controllers processed in {}s", ccount, process_time);
           // endregion:controllers_processing
         }
         sleep(self.cfg.api.poll_period).await;
