@@ -4,12 +4,13 @@ use chrono::Utc;
 pub struct Metrics {
   pub pilots_online: usize,
   pub controllers_online: usize,
-  pub track_count: usize,
-  pub track_point_count: usize,
+  pub track_count: u64,
+  pub track_point_count: u64,
   pub vatsim_data_timestamp: i64,
   pub vatsim_data_load_time_sec: f32,
   pub pilots_processing_time_sec: f32,
   pub controllers_processing_time_sec: f32,
+  pub db_cleanup_time_sec: f32,
 }
 
 impl Metrics {
@@ -44,6 +45,7 @@ impl Metrics {
       "vatsim_data_load_time_sec {}",
       self.vatsim_data_load_time_sec
     ));
+    metrics.push(format!("db_cleanup_time_sec {}", self.db_cleanup_time_sec));
 
     metrics.join("\n") + "\n"
   }

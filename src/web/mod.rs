@@ -186,3 +186,8 @@ pub async fn build_info() -> Json<BuildInfo> {
     license: license_file,
   })
 }
+
+#[get("/metrics")]
+pub async fn metrics(manager: &State<Arc<Manager>>) -> String {
+  manager.render_metrics().await
+}

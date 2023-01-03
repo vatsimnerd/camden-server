@@ -22,10 +22,12 @@ use crate::{
   types::Point,
 };
 use chrono::Utc;
-use log::{error, info};
+use log::{debug, error, info};
 use rstar::{RTree, AABB};
 use std::collections::{HashMap, HashSet};
 use tokio::{sync::RwLock, time::sleep};
+
+const CLEANUP_EVERY_X_ITER: u8 = 5;
 
 #[derive(Debug)]
 pub struct Manager {
@@ -85,6 +87,10 @@ impl Manager {
 
   pub fn config(&self) -> &Config {
     &self.cfg
+  }
+
+  pub async fn render_metrics(&self) -> String {
+    self.metrics.read().await.render()
   }
 
   pub async fn get_pilots(&self, env: &AABB<Point>) -> Vec<Pilot> {
@@ -166,6 +172,8 @@ impl Manager {
     let mut pilots_callsigns = HashSet::new();
     let mut controllers: HashMap<String, Controller> = HashMap::new();
     let mut data_updated_at = 0;
+    let mut cleanup = CLEANUP_EVERY_X_ITER;
+
     loop {
       info!("loading vatsim data");
       let t = Utc::now();
@@ -276,6 +284,37 @@ impl Manager {
           info!("{} controllers processed in {}s", ccount, process_time);
           // endregion:controllers_processing
         }
+
+        if let Some(tracks) = &self.tracks {
+          let res = tracks.read().await.counters().await;
+          match res {
+            Ok((tc, tpc)) => {
+              let mut metrics = self.metrics.write().await;
+              metrics.track_count = tc;
+              metrics.track_point_count = tpc;
+            }
+            Err(err) => {
+              error!("error getting db counters: {err}");
+            }
+          }
+
+          cleanup -= 1;
+          if cleanup == 0 {
+            let t = Utc::now();
+            let res = tracks.write().await.cleanup().await;
+            match res {
+              Err(err) => error!("error cleaning up db: {err}"),
+              Ok(_) => {
+                let process_time = seconds_since(t);
+                info!("db cleanup took {process_time} secs");
+                cleanup = CLEANUP_EVERY_X_ITER;
+              }
+            }
+          } else {
+            debug!("{cleanup} iterations to db cleanup");
+          }
+        }
+
         sleep(self.cfg.api.poll_period).await;
       }
     }
