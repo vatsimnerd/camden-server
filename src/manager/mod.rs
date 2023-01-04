@@ -304,7 +304,9 @@ impl Manager {
         }
 
         if let Some(tracks) = &self.tracks {
+          let t = Utc::now();
           let res = tracks.read().await.counters().await;
+          let process_time = seconds_since(t);
           match res {
             Ok((tc, tpc)) => {
               let mut metrics = self.metrics.write().await;
@@ -314,6 +316,9 @@ impl Manager {
               metrics
                 .database_objects_count
                 .set(labels!("object_type" = "trackpoint"), tpc);
+              metrics
+                .database_objects_count_fetch_time_sec
+                .set_single(process_time);
             }
             Err(err) => {
               error!("error getting db counters: {err}");
