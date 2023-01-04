@@ -1,52 +1,157 @@
 use chrono::Utc;
+use std::{collections::HashMap, fmt::Display};
 
-#[derive(Default, Debug)]
+#[macro_export]
+macro_rules! labels {
+  ($($label:literal = $value:literal),+) => {
+    {
+      let mut c: HashMap<&'static str, String> = HashMap::new();
+      $(c.insert(($label).into(), ($value).into());)+
+      c
+    }
+  };
+}
+
+#[derive(Debug)]
+pub enum MetricType {
+  Gauge,
+  Summary,
+  Histogram,
+}
+
+impl Display for MetricType {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      MetricType::Gauge => write!(f, "gauge"),
+      MetricType::Summary => write!(f, "summary"),
+      MetricType::Histogram => write!(f, "histogram"),
+    }
+  }
+}
+
+#[derive(Debug)]
+pub struct Metric<T: Display + Clone> {
+  name: String,
+  help: String,
+  metric_type: MetricType,
+  values: HashMap<String, T>,
+}
+
+impl<T: Display + Clone> Metric<T> {
+  pub fn new(name: &str, help: &str, mtype: MetricType) -> Self {
+    Self {
+      name: name.into(),
+      help: help.into(),
+      metric_type: mtype,
+      values: HashMap::new(),
+    }
+  }
+
+  pub fn reset(&mut self) {
+    self.values.clear();
+  }
+
+  pub fn set(&mut self, labels: HashMap<&'static str, String>, value: T) {
+    let label_str = labels
+      .iter()
+      .map(|(k, v)| format!("{}=\"{}\"", k, v))
+      .collect::<Vec<String>>()
+      .join(",");
+    self.values.insert(label_str, value);
+  }
+
+  pub fn set_single(&mut self, value: T) {
+    self.reset();
+    self.values.insert("_".into(), value);
+  }
+
+  pub fn render(&self) -> String {
+    let vlen = self.values.len();
+    let comment = format!(
+      "# HELP {} {}\n# TYPE {} {}\n",
+      self.name, self.help, self.name, self.metric_type
+    );
+
+    match vlen {
+      0 => "".into(),
+      1 => {
+        let value = &self.values.values().cloned().collect::<Vec<T>>()[0];
+        comment + &format!("{} {}", self.name, value) + "\n"
+      }
+      _ => {
+        let values = self
+          .values
+          .iter()
+          .map(|(k, v)| format!("{}{{{}}} {}", self.name, k, v))
+          .collect::<Vec<String>>()
+          .join("\n");
+        comment + &values + "\n"
+      }
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct Metrics {
-  pub pilots_online: usize,
-  pub controllers_online: usize,
-  pub track_count: u64,
-  pub track_point_count: u64,
+  pub vatsim_objects_online: Metric<usize>,
+  pub database_objects_count: Metric<u64>,
   pub vatsim_data_timestamp: i64,
-  pub vatsim_data_load_time_sec: f32,
-  pub pilots_processing_time_sec: f32,
-  pub controllers_processing_time_sec: f32,
-  pub db_cleanup_time_sec: f32,
+  pub vatsim_data_load_time_sec: Metric<f32>,
+  pub processing_time_sec: Metric<f32>,
+  pub db_cleanup_time_sec: Metric<f32>,
 }
 
 impl Metrics {
   pub fn new() -> Self {
-    Default::default()
+    Self {
+      vatsim_objects_online: Metric::new(
+        "vatsim_objects_online",
+        "Vatsim objects currently tracked",
+        MetricType::Gauge,
+      ),
+      database_objects_count: Metric::new(
+        "database_objects_count",
+        "Number of objects stored in database",
+        MetricType::Gauge,
+      ),
+      vatsim_data_timestamp: 0,
+      vatsim_data_load_time_sec: Metric::new(
+        "vatsim_data_load_time_sec",
+        "Vatsim API data load time",
+        MetricType::Gauge,
+      ),
+      processing_time_sec: Metric::new(
+        "processing_time_sec",
+        "Processing time for various vatsim objects",
+        MetricType::Gauge,
+      ),
+      db_cleanup_time_sec: Metric::new(
+        "db_cleanup_time_sec",
+        "Time spent cleaning up database stored objects",
+        MetricType::Gauge,
+      ),
+    }
   }
 
   pub fn render(&self) -> String {
     let t = Utc::now().timestamp();
     let mut metrics = vec![];
 
-    metrics.push(format!(
-      r#"vatsim_objects_online{{type="pilot"}} {}"#,
-      self.pilots_online
-    ));
-    metrics.push(format!(
-      r#"vatsim_objects_online{{type="controller"}} {}"#,
-      self.controllers_online
-    ));
-    metrics.push(format!(
-      r#"database_objects_count{{type="track"}} {}"#,
-      self.track_count
-    ));
-    metrics.push(format!(
-      r#"database_objects_count{{type="trackpoint"}} {}"#,
-      self.track_point_count
-    ));
+    metrics.push(self.vatsim_objects_online.render());
+    metrics.push(self.database_objects_count.render());
 
     let age = t - self.vatsim_data_timestamp;
-    metrics.push(format!("vatsim_data_age_sec {age}"));
-    metrics.push(format!(
-      "vatsim_data_load_time_sec {}",
-      self.vatsim_data_load_time_sec
-    ));
-    metrics.push(format!("db_cleanup_time_sec {}", self.db_cleanup_time_sec));
+    let mut metric = Metric::new(
+      "vatsim_data_age_sec",
+      "Latest Vatsim data age in seconds",
+      MetricType::Gauge,
+    );
+    metric.set_single(age);
+    metrics.push(metric.render());
 
-    metrics.join("\n") + "\n"
+    metrics.push(self.vatsim_data_load_time_sec.render());
+    metrics.push(self.db_cleanup_time_sec.render());
+
+    metrics.join("")
   }
 }

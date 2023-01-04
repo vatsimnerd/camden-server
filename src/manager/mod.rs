@@ -12,6 +12,7 @@ use crate::{
     parser::load_fixed,
     types::{Airport, FIR},
   },
+  labels,
   moving::{
     controller::{Controller, Facility},
     load_vatsim_data,
@@ -183,7 +184,12 @@ impl Manager {
       let t = Utc::now();
       let data = load_vatsim_data(&self.cfg).await;
       let process_time = seconds_since(t);
-      self.metrics.write().await.vatsim_data_load_time_sec = process_time;
+      self
+        .metrics
+        .write()
+        .await
+        .vatsim_data_load_time_sec
+        .set_single(process_time);
       info!("vatsim data loaded in {}s", process_time);
       if let Some(data) = data {
         let ts = data.general.updated_at.timestamp();
@@ -239,8 +245,12 @@ impl Manager {
           let process_time = seconds_since(t);
           {
             let mut metrics = self.metrics.write().await;
-            metrics.pilots_processing_time_sec = process_time;
-            metrics.pilots_online = pilots_callsigns.len();
+            metrics
+              .processing_time_sec
+              .set(labels!("object_type" = "pilot"), process_time);
+            metrics
+              .vatsim_objects_online
+              .set(labels!("object_type" = "pilot"), pilots_callsigns.len());
           }
           info!("{} pilots processed in {}s", pcount, process_time);
           // endregion:pilots_processing
@@ -282,8 +292,12 @@ impl Manager {
           let process_time = seconds_since(t);
           {
             let mut metrics = self.metrics.write().await;
-            metrics.controllers_processing_time_sec = process_time;
-            metrics.controllers_online = controllers.len();
+            metrics
+              .processing_time_sec
+              .set(labels!("object_type" = "controller"), process_time);
+            metrics
+              .vatsim_objects_online
+              .set(labels!("object_type" = "controller"), controllers.len());
           }
           info!("{} controllers processed in {}s", ccount, process_time);
           // endregion:controllers_processing
@@ -294,8 +308,12 @@ impl Manager {
           match res {
             Ok((tc, tpc)) => {
               let mut metrics = self.metrics.write().await;
-              metrics.track_count = tc;
-              metrics.track_point_count = tpc;
+              metrics
+                .database_objects_count
+                .set(labels!("object_type" = "track"), tc);
+              metrics
+                .database_objects_count
+                .set(labels!("object_type" = "trackpoint"), tpc);
             }
             Err(err) => {
               error!("error getting db counters: {err}");
