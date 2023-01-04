@@ -1,5 +1,7 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use std::{collections::HashMap, fmt::Display};
+
+use crate::seconds_since;
 
 #[macro_export]
 macro_rules! labels {
@@ -14,6 +16,7 @@ macro_rules! labels {
 
 #[derive(Debug)]
 pub enum MetricType {
+  Counter,
   Gauge,
   Summary,
   Histogram,
@@ -22,6 +25,7 @@ pub enum MetricType {
 impl Display for MetricType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
+      MetricType::Counter => write!(f, "counter"),
       MetricType::Gauge => write!(f, "gauge"),
       MetricType::Summary => write!(f, "summary"),
       MetricType::Histogram => write!(f, "histogram"),
@@ -103,6 +107,7 @@ pub struct Metrics {
   pub vatsim_data_load_time_sec: Metric<f32>,
   pub processing_time_sec: Metric<f32>,
   pub db_cleanup_time_sec: Metric<f32>,
+  pub process_started_at: DateTime<Utc>,
 }
 
 impl Metrics {
@@ -139,6 +144,7 @@ impl Metrics {
         "Time spent cleaning up database stored objects",
         MetricType::Gauge,
       ),
+      process_started_at: Utc::now(),
     }
   }
 
@@ -161,6 +167,11 @@ impl Metrics {
 
     metrics.push(self.vatsim_data_load_time_sec.render());
     metrics.push(self.db_cleanup_time_sec.render());
+
+    let mut metric = Metric::new("uptime", "Process uptime in sec", MetricType::Counter);
+    let sec = seconds_since(self.process_started_at).ceil() as u64;
+    metric.set_single(sec);
+    metrics.push(metric.render());
 
     metrics.join("")
   }
