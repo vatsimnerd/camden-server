@@ -112,9 +112,9 @@ impl TrackStore {
 
   pub async fn counters(&self) -> Result<(u64, u64), mongodb::error::Error> {
     let coll: Collection<TrackPoint> = self.db.collection(TrackPoint::collection());
-    let tp_count = coll.count_documents(doc! {}, None).await?;
+    let tp_count = coll.estimated_document_count(None).await?;
     let coll: Collection<Track> = self.db.collection(Track::collection());
-    let t_count = coll.count_documents(doc! {}, None).await?;
+    let t_count = coll.estimated_document_count(None).await?;
     Ok((t_count, tp_count))
   }
 
