@@ -30,19 +30,21 @@ impl Display for MetricType {
 }
 
 #[derive(Debug)]
-pub struct Metric<T: Display + Clone> {
+pub struct Metric<T: Display + Clone + Default> {
   name: String,
   help: String,
   metric_type: MetricType,
+  single: bool,
   values: HashMap<String, T>,
 }
 
-impl<T: Display + Clone> Metric<T> {
+impl<T: Display + Clone + Default> Metric<T> {
   pub fn new(name: &str, help: &str, mtype: MetricType) -> Self {
     Self {
       name: name.into(),
       help: help.into(),
       metric_type: mtype,
+      single: false,
       values: HashMap::new(),
     }
   }
@@ -52,6 +54,7 @@ impl<T: Display + Clone> Metric<T> {
   }
 
   pub fn set(&mut self, labels: HashMap<&'static str, String>, value: T) {
+    self.single = false;
     let label_str = labels
       .iter()
       .map(|(k, v)| format!("{}=\"{}\"", k, v))
@@ -62,31 +65,31 @@ impl<T: Display + Clone> Metric<T> {
 
   pub fn set_single(&mut self, value: T) {
     self.reset();
+    self.single = true;
     self.values.insert("_".into(), value);
   }
 
   pub fn render(&self) -> String {
-    let vlen = self.values.len();
+    if self.values.len() == 0 {
+      return "".into();
+    }
+
     let comment = format!(
       "# HELP {} {}\n# TYPE {} {}\n",
       self.name, self.help, self.name, self.metric_type
     );
 
-    match vlen {
-      0 => "".into(),
-      1 => {
-        let value = &self.values.values().cloned().collect::<Vec<T>>()[0];
-        comment + &format!("{} {}", self.name, value) + "\n"
-      }
-      _ => {
-        let values = self
-          .values
-          .iter()
-          .map(|(k, v)| format!("{}{{{}}} {}", self.name, k, v))
-          .collect::<Vec<String>>()
-          .join("\n");
-        comment + &values + "\n"
-      }
+    if self.single {
+      let value = self.values.get("_").cloned().unwrap_or_default();
+      comment + &format!("{} {}", self.name, value) + "\n"
+    } else {
+      let values = self
+        .values
+        .iter()
+        .map(|(k, v)| format!("{}{{{}}} {}", self.name, k, v))
+        .collect::<Vec<String>>()
+        .join("\n");
+      comment + &values + "\n"
     }
   }
 }
@@ -95,6 +98,7 @@ impl<T: Display + Clone> Metric<T> {
 pub struct Metrics {
   pub vatsim_objects_online: Metric<usize>,
   pub database_objects_count: Metric<u64>,
+  pub database_objects_count_fetch_time_sec: Metric<f32>,
   pub vatsim_data_timestamp: i64,
   pub vatsim_data_load_time_sec: Metric<f32>,
   pub processing_time_sec: Metric<f32>,
@@ -112,6 +116,11 @@ impl Metrics {
       database_objects_count: Metric::new(
         "database_objects_count",
         "Number of objects stored in database",
+        MetricType::Gauge,
+      ),
+      database_objects_count_fetch_time_sec: Metric::new(
+        "database_objects_count_fetch_time_sec",
+        "Time spent fetching countDocuments()",
         MetricType::Gauge,
       ),
       vatsim_data_timestamp: 0,
@@ -139,6 +148,7 @@ impl Metrics {
 
     metrics.push(self.vatsim_objects_online.render());
     metrics.push(self.database_objects_count.render());
+    metrics.push(self.database_objects_count_fetch_time_sec.render());
 
     let age = t - self.vatsim_data_timestamp;
     let mut metric = Metric::new(
