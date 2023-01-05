@@ -26,6 +26,10 @@ Most data is served via Server-sent events API `/api/updates/<min_lng>/<min_lat>
 
 `/api/airports/<ICAO or IATA>` searches for an airport. This can be used to fetch uncontrolled airports while the updates API only pushes the controlled ones.
 
+`/api/chkquery?query=...` checks if the pilot's filter is correct. Filtering involves complex things like lexer/parser/compiler/evaluater and every stage may produce errors. This handler is useful for the frontend part so the app is sure the filter is correct before re-requesting updates.
+
+`/api/__build__` contains internal metadata like like package name and version
+
 ## What else
 
 Camden server is under development and it still lacks some SimWatch features like the aircraft type database.
