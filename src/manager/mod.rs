@@ -10,7 +10,7 @@ use crate::{
   fixed::{
     data::FixedData,
     parser::load_fixed,
-    types::{Airport, FIR},
+    types::{Airport, GeonamesCountry, FIR},
   },
   labels,
   moving::{
@@ -34,6 +34,7 @@ const CLEANUP_EVERY_X_ITER: u8 = 5;
 pub struct Manager {
   cfg: Config,
   fixed: RwLock<FixedData>,
+
   pilots: RwLock<HashMap<String, Pilot>>,
   pilots2d: RwLock<RTree<PointObject>>,
   pilots_po: RwLock<HashMap<String, PointObject>>,
@@ -41,6 +42,8 @@ pub struct Manager {
   airports2d: RwLock<RTree<PointObject>>,
   firs2d: RwLock<RTree<RectObject>>,
   tracks: Option<RwLock<TrackStore>>,
+
+  gn_countries: RwLock<HashMap<u32, GeonamesCountry>>,
 
   metrics: RwLock<Metrics>,
 }
@@ -87,6 +90,7 @@ impl Manager {
       firs2d: RwLock::new(RTree::new()),
       tracks,
       metrics: RwLock::new(Metrics::new()),
+      gn_countries: RwLock::new(HashMap::new()),
     }
   }
 

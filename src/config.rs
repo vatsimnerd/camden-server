@@ -28,7 +28,7 @@ impl Default for Cache {
     Self {
       runways: "/tmp/runways.csv.cache".to_owned(),
       geonames_countries: "/tmp/geonames.countries.csv.cache".to_owned(),
-      geonames_shapes: "/tmp/geonames.shapes.csv.cache".to_owned(),
+      geonames_shapes: "/tmp/geonames.shapes.json.zip".to_owned(),
     }
   }
 }

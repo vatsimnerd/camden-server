@@ -20,9 +20,9 @@ async fn cached_loader(url: &str, cache_filename: &str) -> Result<File, Box<dyn 
   if !path.is_file() {
     info!("fetching {url} from web");
     let t = Utc::now();
-    let data = reqwest::get(url).await?.text().await?;
+    let data = reqwest::get(url).await?.bytes().await?;
     let mut cache_file = File::create(path)?;
-    cache_file.write_all(data.as_bytes())?;
+    cache_file.write_all(&data)?;
     info!(
       "data loaded from web in {}s and stored in {cache_filename}",
       seconds_since(t)

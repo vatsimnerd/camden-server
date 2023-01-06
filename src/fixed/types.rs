@@ -1,12 +1,11 @@
+use super::ourairports::Runway;
 use crate::{
   atis::runways::{detect_arrivals, detect_departures, normalize_atis_text},
   moving::controller::{Controller, ControllerSet},
   types::Point,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-use super::ourairports::Runway;
 
 #[derive(Debug, Clone)]
 pub struct Country {
@@ -100,4 +99,27 @@ impl PartialEq for Boundaries {
   fn eq(&self, other: &Self) -> bool {
     self.id == other.id
   }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GeonamesCountry {
+  pub iso: String,
+  pub iso3: String,
+  pub iso_numeric: String,
+  pub fips: String,
+  pub name: String,
+  pub capital: String,
+  pub area: f64,
+  pub population: u64,
+  pub continent: String,
+  pub tld: String,
+  pub currency_code: String,
+  pub currency_name: String,
+  pub phone: String,
+  pub postal_code_format: String,
+  pub postal_code_regex: String,
+  pub languages: String,
+  pub geoname_id: u32,
+  pub neighbours: String,
+  pub equivalent_fips_code: String,
 }
