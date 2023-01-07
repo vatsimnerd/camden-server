@@ -1,12 +1,15 @@
+use super::{errors::GeonamesParseError, ourairports::Runway};
 use crate::{
   atis::runways::{detect_arrivals, detect_departures, normalize_atis_text},
   moving::controller::{Controller, ControllerSet},
   types::Point,
 };
-use serde::Serialize;
+use geo_types::Polygon;
+use geo_types::{geometry::Coord, LineString};
+use geojson::{Feature, Value};
+use rstar::{RTreeObject, AABB};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-use super::ourairports::Runway;
 
 #[derive(Debug, Clone)]
 pub struct Country {
@@ -99,5 +102,128 @@ impl PartialEq for Boundaries {
   // simplify partial eq as boundaries don't change within a single app run
   fn eq(&self, other: &Self) -> bool {
     self.id == other.id
+  }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct GeonamesCountry {
+  pub iso: String,
+  pub iso3: String,
+  pub iso_numeric: String,
+  pub fips: String,
+  pub name: String,
+  pub capital: String,
+  pub area: f64,
+  pub population: u64,
+  pub continent: String,
+  pub tld: String,
+  pub currency_code: String,
+  pub currency_name: String,
+  pub phone: String,
+  pub postal_code_format: String,
+  pub postal_code_regex: String,
+  pub languages: String,
+  pub geoname_id: String,
+  pub neighbours: String,
+  pub equivalent_fips_code: String,
+}
+
+// TODO: it's time to consider a universal rtree-insertable type
+#[derive(Debug, Clone)]
+pub struct GeonamesShape {
+  pub poly: Polygon,
+  pub ref_id: String,
+}
+
+impl RTreeObject for GeonamesShape {
+  type Envelope = AABB<geo_types::Point<f64>>;
+
+  fn envelope(&self) -> Self::Envelope {
+    self.poly.envelope()
+  }
+}
+
+impl GeonamesShape {
+  pub fn from_vec(ref_id: impl Into<String>, rings: Vec<Vec<Vec<f64>>>) -> Self {
+    let mut rings: Vec<Vec<Coord>> = rings
+      .into_iter()
+      .map(|sp| {
+        sp.into_iter()
+          .map(|ssp| Coord {
+            x: ssp[0],
+            y: ssp[1],
+          })
+          .collect()
+      })
+      .collect();
+    let exterior = LineString::from(rings.swap_remove(0));
+    let interior: Vec<LineString> = rings
+      .into_iter()
+      .map(|cvec| LineString::from(cvec))
+      .collect();
+    let poly = Polygon::new(exterior, interior);
+    Self {
+      poly,
+      ref_id: ref_id.into(),
+    }
+  }
+}
+
+#[derive(Debug)]
+pub enum GeonamesShapeSet {
+  Single(GeonamesShape),
+  Multi(Vec<GeonamesShape>),
+}
+
+impl TryFrom<Feature> for GeonamesShapeSet {
+  type Error = GeonamesParseError;
+
+  fn try_from(value: Feature) -> Result<Self, Self::Error> {
+    let geom = value.geometry.as_ref();
+    let props = value.properties.as_ref();
+
+    let geoname_id = if let Some(props) = props {
+      let prop = props.get("geoNameId");
+      if let Some(prop) = prop {
+        match prop {
+          serde_json::Value::String(s) => s.to_owned(),
+          _ => {
+            return Err(Self::Error {
+              msg: "geoNameId is of incorrect type",
+            });
+          }
+        }
+      } else {
+        return Err(Self::Error {
+          msg: "geoNameId is absent in feature properties",
+        });
+      }
+    } else {
+      return Err(Self::Error {
+        msg: "no geojson properties defined for feature",
+      });
+    };
+
+    if let Some(geom) = geom {
+      match geom.value.clone() {
+        Value::MultiPolygon(mp) => {
+          let mut gss = vec![];
+          for poly in mp.into_iter() {
+            let gs = GeonamesShape::from_vec(geoname_id.to_owned(), poly);
+            gss.push(gs);
+          }
+          return Ok(Self::Multi(gss));
+        }
+        Value::Polygon(poly) => {
+          let gs = GeonamesShape::from_vec(geoname_id.to_owned(), poly);
+          return Ok(Self::Single(gs));
+        }
+        _ => unimplemented!(),
+      }
+    } else {
+      return Err(Self::Error {
+        msg: "feature geometry is absent",
+      });
+    }
   }
 }

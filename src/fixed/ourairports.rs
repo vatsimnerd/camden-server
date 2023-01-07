@@ -7,12 +7,10 @@ use std::{
   error::Error,
   fmt::Display,
   fs::File,
-  io::Write,
   num::{ParseFloatError, ParseIntError},
-  path::Path,
 };
 
-use crate::{config::Config, seconds_since};
+use crate::{config::Config, fixed::cached_loader, seconds_since};
 
 #[derive(Debug, PartialEq, Serialize, Clone)]
 pub struct Runway {
@@ -142,21 +140,7 @@ async fn parse(src: File) -> Result<HashMap<String, Vec<Runway>>, Box<dyn Error>
 }
 
 pub async fn load_runways(cfg: &Config) -> Result<HashMap<String, Vec<Runway>>, Box<dyn Error>> {
-  let path = Path::new(&cfg.cache.runways);
-  if !path.is_file() {
-    info!("loading runways data from web");
-    let t = Utc::now();
-    let data = reqwest::get(&cfg.fixed.runways_url).await?.text().await?;
-    let mut cache_file = File::create(path)?;
-    cache_file.write_all(data.as_bytes())?;
-    info!(
-      "runways loaded in {}s and stored to cache",
-      seconds_since(t)
-    );
-  } else {
-    info!("runways cache found, skipping fetching")
-  }
-  let cache_file = File::open(path)?;
+  let cache_file = cached_loader(&cfg.fixed.runways_url, &cfg.cache.runways).await?;
   let t = Utc::now();
   let res = parse(cache_file).await;
   info!("runways data parsed in {}s", seconds_since(t));

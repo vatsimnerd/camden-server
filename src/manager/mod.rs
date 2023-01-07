@@ -9,8 +9,9 @@ use crate::{
   config::Config,
   fixed::{
     data::FixedData,
+    geonames::{load_countries, load_shapes},
     parser::load_fixed,
-    types::{Airport, FIR},
+    types::{Airport, GeonamesCountry, GeonamesShape, FIR},
   },
   labels,
   moving::{
@@ -23,6 +24,7 @@ use crate::{
   types::Point,
 };
 use chrono::Utc;
+use geo::algorithm::Contains;
 use log::{debug, error, info};
 use rstar::{RTree, AABB};
 use std::collections::{HashMap, HashSet};
@@ -34,6 +36,7 @@ const CLEANUP_EVERY_X_ITER: u8 = 5;
 pub struct Manager {
   cfg: Config,
   fixed: RwLock<FixedData>,
+
   pilots: RwLock<HashMap<String, Pilot>>,
   pilots2d: RwLock<RTree<PointObject>>,
   pilots_po: RwLock<HashMap<String, PointObject>>,
@@ -41,6 +44,9 @@ pub struct Manager {
   airports2d: RwLock<RTree<PointObject>>,
   firs2d: RwLock<RTree<RectObject>>,
   tracks: Option<RwLock<TrackStore>>,
+
+  gn_countries: RwLock<HashMap<String, GeonamesCountry>>,
+  gn_shapes: RwLock<RTree<GeonamesShape>>,
 
   metrics: RwLock<Metrics>,
 }
@@ -87,6 +93,8 @@ impl Manager {
       firs2d: RwLock::new(RTree::new()),
       tracks,
       metrics: RwLock::new(Metrics::new()),
+      gn_countries: RwLock::new(HashMap::new()),
+      gn_shapes: RwLock::new(RTree::new()),
     }
   }
 
@@ -171,8 +179,48 @@ impl Manager {
     }
   }
 
+  async fn setup_geonames_data(&self) -> Result<(), Box<dyn std::error::Error>> {
+    let t = Utc::now();
+    let geonames_countries = load_countries(&self.cfg).await?;
+    {
+      let mut gn = self.gn_countries.write().await;
+      for (k, v) in geonames_countries.into_iter() {
+        gn.insert(k, v);
+      }
+    }
+    debug!("geonames countries processed in {}s", seconds_since(t));
+
+    let t = Utc::now();
+    let geonames_shapes = load_shapes(&self.cfg).await?;
+    {
+      // consider bulk loading for better startup performance
+      let mut tree = self.gn_shapes.write().await;
+      for shape in geonames_shapes {
+        tree.insert(shape);
+      }
+    }
+    debug!("geonames shapes processed in {}s", seconds_since(t));
+    Ok(())
+  }
+
+  pub async fn search_country(&self, position: Point) -> Option<GeonamesCountry> {
+    let pcoord: geo_types::Point = position.into();
+    let envelope = AABB::from_point(pcoord);
+    let tree = self.gn_shapes.read().await;
+    let mut res = tree.locate_in_envelope_intersecting(&envelope);
+    let geo_id = res
+      .find(|gs| gs.poly.contains(&pcoord))
+      .map(|gs| &gs.ref_id);
+    if let Some(geo_id) = geo_id {
+      self.gn_countries.read().await.get(geo_id).cloned()
+    } else {
+      None
+    }
+  }
+
   pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
     self.setup_fixed_data().await?;
+    self.setup_geonames_data().await?;
 
     let mut pilots_callsigns = HashSet::new();
     let mut controllers: HashMap<String, Controller> = HashMap::new();
@@ -203,6 +251,7 @@ impl Manager {
           let t = Utc::now();
           let pcount = data.pilots.len();
 
+          let mut pilots_grouped = HashMap::new();
           {
             for pilot in data.pilots.into_iter() {
               // avoid duplication in rtree
@@ -226,8 +275,21 @@ impl Manager {
                 }
               }
 
-              // we have to keep point objects in both hashmap and rtree
-              // because rtree doesn't support searching by id
+              let country = self.search_country(pilot.position).await;
+              if let Some(country) = country {
+                let counter = pilots_grouped.entry(country.geoname_id).or_insert(0);
+                *counter += 1;
+              }
+
+              // We have to keep point objects in both hashmap and rtree
+              // because rtree doesn't support searching by id:
+              //
+              // We need to search point objects by id for removing a pilot
+              // from RTree "by id". We search for a point object in the HashMap
+              // then we pass it to .remove() method of the tree where it's
+              // being searched by coords and then checked with PartialEq,
+              // so it's OK that the HashMap and RTree contain copies of the object.
+              // See remove_pilot() method for details
               pilots2d.insert(po.clone());
               pilots_po.insert(pilot.callsign.clone(), po);
               pilots.insert(pilot.callsign.clone(), pilot);
@@ -245,12 +307,22 @@ impl Manager {
           let process_time = seconds_since(t);
           {
             let mut metrics = self.metrics.write().await;
+            let countries = self.gn_countries.read().await;
             metrics
               .processing_time_sec
               .set(labels!("object_type" = "pilot"), process_time);
-            metrics
-              .vatsim_objects_online
-              .set(labels!("object_type" = "pilot"), pilots_callsigns.len());
+
+            for (geo_id, count) in pilots_grouped {
+              let country = countries.get(&geo_id).unwrap();
+              metrics.vatsim_objects_online.set(
+                labels!(
+                  "object_type" = "pilot",
+                  "country_code" = &country.iso,
+                  "continent_code" = &country.continent
+                ),
+                count,
+              );
+            }
           }
           info!("{} pilots processed in {}s", pcount, process_time);
           // endregion:pilots_processing

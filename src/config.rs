@@ -19,12 +19,16 @@ impl Default for Camden {
 #[derive(Deserialize, Debug, Clone)]
 pub struct Cache {
   pub runways: String,
+  pub geonames_countries: String,
+  pub geonames_shapes: String,
 }
 
 impl Default for Cache {
   fn default() -> Self {
     Self {
       runways: "/tmp/runways.csv.cache".to_owned(),
+      geonames_countries: "/tmp/geonames.countries.csv.cache".to_owned(),
+      geonames_shapes: "/tmp/geonames.shapes.json.zip".to_owned(),
     }
   }
 }
@@ -77,6 +81,8 @@ pub struct Fixed {
   pub data_url: String,
   pub boundaries_url: String,
   pub runways_url: String,
+  pub geonames_countries_url: String,
+  pub geonames_shapes_url: String,
 }
 
 impl Default for Fixed {
@@ -87,6 +93,8 @@ impl Default for Fixed {
           .to_owned(),
       boundaries_url: "https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson".to_owned(),
       runways_url: "https://ourairports.com/data/runways.csv".to_owned(),
+      geonames_countries_url: "http://download.geonames.org/export/dump/countryInfo.txt".to_owned(),
+      geonames_shapes_url: "http://download.geonames.org/export/dump/shapes_simplified_low.json.zip".to_owned()
     }
   }
 }

@@ -5,7 +5,7 @@ use crate::seconds_since;
 
 #[macro_export]
 macro_rules! labels {
-  ($($label:literal = $value:literal),+) => {
+  ($($label:literal = $value:expr),+) => {
     {
       let mut c: HashMap<&'static str, String> = HashMap::new();
       $(c.insert(($label).into(), ($value).into());)+
@@ -59,11 +59,12 @@ impl<T: Display + Clone + Default> Metric<T> {
 
   pub fn set(&mut self, labels: HashMap<&'static str, String>, value: T) {
     self.single = false;
-    let label_str = labels
+    let mut labels = labels
       .iter()
       .map(|(k, v)| format!("{}=\"{}\"", k, v))
-      .collect::<Vec<String>>()
-      .join(",");
+      .collect::<Vec<String>>();
+    labels.sort();
+    let label_str = labels.join(",");
     self.values.insert(label_str, value);
   }
 
