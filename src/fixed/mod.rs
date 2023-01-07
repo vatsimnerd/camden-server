@@ -3,6 +3,7 @@
 /// FIRs and UIRs as well as ourairports' data on runways
 mod boundaries;
 pub mod data;
+pub mod errors;
 pub mod geonames;
 pub mod ourairports;
 pub mod parser;
