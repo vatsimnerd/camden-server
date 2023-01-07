@@ -1,3 +1,4 @@
+use geo_types::{Coord, Point as GeoPoint};
 use rstar::AABB;
 use serde::Serialize;
 
@@ -5,6 +6,15 @@ use serde::Serialize;
 pub struct Point {
   pub lat: f64,
   pub lng: f64,
+}
+
+impl From<Point> for GeoPoint {
+  fn from(val: Point) -> Self {
+    Self(Coord {
+      x: val.lng,
+      y: val.lat,
+    })
+  }
 }
 
 impl Point {

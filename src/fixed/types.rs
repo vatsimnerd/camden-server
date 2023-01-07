@@ -105,7 +105,7 @@ impl PartialEq for Boundaries {
   }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GeonamesCountry {
   pub iso: String,
   pub iso3: String,
@@ -123,13 +123,13 @@ pub struct GeonamesCountry {
   pub postal_code_format: String,
   pub postal_code_regex: String,
   pub languages: String,
-  pub geoname_id: u32,
+  pub geoname_id: String,
   pub neighbours: String,
   pub equivalent_fips_code: String,
 }
 
 // TODO: it's time to consider a universal rtree-insertable type
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GeonamesShape {
   pub poly: Polygon,
   pub ref_id: String,

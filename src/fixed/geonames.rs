@@ -9,14 +9,14 @@ use crate::{
 };
 use chrono::Utc;
 use csv::StringRecord;
-use geojson::{FeatureCollection, GeoJson, Value};
-use log::{error, info};
+use geojson::{FeatureCollection, GeoJson};
+use log::info;
 use std::{collections::HashMap, fs::File, io::Read};
 use zip::ZipArchive;
 
 fn parse_countries(
   file: File,
-) -> Result<HashMap<u32, GeonamesCountry>, Box<dyn std::error::Error>> {
+) -> Result<HashMap<String, GeonamesCountry>, Box<dyn std::error::Error>> {
   let mut rdr = csv::ReaderBuilder::new()
     .has_headers(false)
     .delimiter(b'\t')
@@ -52,7 +52,7 @@ fn parse_countries(
       println!("{err}, {:?}", err.position());
     } else {
       let country: GeonamesCountry = res.unwrap();
-      countries.insert(country.geoname_id, country);
+      countries.insert(country.geoname_id.clone(), country);
     }
   }
   Ok(countries)
@@ -60,7 +60,7 @@ fn parse_countries(
 
 pub async fn load_countries(
   cfg: &Config,
-) -> Result<HashMap<u32, GeonamesCountry>, Box<dyn std::error::Error>> {
+) -> Result<HashMap<String, GeonamesCountry>, Box<dyn std::error::Error>> {
   let cache_file = cached_loader(
     &cfg.fixed.geonames_countries_url,
     &cfg.cache.geonames_countries,
@@ -140,13 +140,13 @@ pub mod tests {
 
     let geom = feature.geometry.unwrap();
     match geom.value {
-      Value::MultiPolygon(mp) => {
+      geojson::Value::MultiPolygon(mp) => {
         for p in mp.into_iter() {
           let gs = GeonamesShape::from_vec(geo_id, p);
           println!("{gs:?}");
         }
       }
-      Value::Polygon(p) => {
+      geojson::Value::Polygon(p) => {
         let gs = GeonamesShape::from_vec(geo_id, p);
         println!("{gs:?}");
       }
