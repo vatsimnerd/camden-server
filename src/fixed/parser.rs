@@ -1,6 +1,7 @@
 use super::{
   boundaries::load_boundaries,
   data::FixedData,
+  geonames::Geonames,
   ourairports::{load_runways, Runway},
   types::{Airport, Boundaries, Country, FIR, UIR},
 };
@@ -32,6 +33,7 @@ fn parse(
   src: &str,
   bdrs: HashMap<String, Boundaries>,
   mut runway_map: HashMap<String, Vec<Runway>>,
+  geonames: Geonames,
 ) -> Result<FixedData, ParseError> {
   let mut state = ParserState::Idle;
   let mut countries = vec![];
@@ -106,18 +108,22 @@ fn parse(
               }
             }
 
+            let position = Point {
+              lat: lat.unwrap(),
+              lng: lng.unwrap(),
+            };
+            let country = geonames.get_country_by_position(position);
+
             let a = Airport {
               icao,
               iata: tokens[4].into(),
               name: tokens[1].into(),
-              position: Point {
-                lat: lat.unwrap(),
-                lng: lng.unwrap(),
-              },
+              position,
               fir_id: tokens[5].into(),
               is_pseudo: tokens[6] == "1",
               controllers: ControllerSet::empty(),
               runways,
+              country,
             };
 
             airports.push(a);
@@ -139,12 +145,14 @@ fn parse(
 
             let boundaries = bdrs.get(b_id);
             if let Some(boundaries) = boundaries {
+              let country = geonames.get_country_by_position(boundaries.center);
               let fir = FIR {
                 icao: tokens[0].into(),
                 name: tokens[1].into(),
                 prefix: tokens[2].into(),
                 boundaries: boundaries.clone(),
                 controllers: HashMap::new(),
+                country,
               };
               firs.push(fir);
             } else {
@@ -173,13 +181,14 @@ fn parse(
     }
   }
 
-  Ok(FixedData::new(countries, airports, firs, uirs))
+  Ok(FixedData::new(countries, airports, firs, uirs, geonames))
 }
 
 pub async fn load_fixed(cfg: &Config) -> Result<FixedData, Box<dyn Error>> {
   let boundaries = load_boundaries(&cfg.fixed.boundaries_url).await?;
   let text = reqwest::get(&cfg.fixed.data_url).await?.text().await?;
   let runways = load_runways(cfg).await?;
-  let data = parse(&text, boundaries, runways)?;
+  let geonames = Geonames::load(cfg).await?;
+  let data = parse(&text, boundaries, runways, geonames)?;
   Ok(data)
 }

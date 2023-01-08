@@ -8,6 +8,7 @@ pub mod manager;
 pub mod moving;
 pub mod track;
 pub mod types;
+pub mod util;
 pub mod web;
 
 pub fn seconds_since(t: DateTime<Utc>) -> f32 {

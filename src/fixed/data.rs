@@ -1,5 +1,11 @@
-use super::types::{Airport, Country, FIR, UIR};
-use crate::moving::controller::{Controller, Facility};
+use super::{
+  geonames::Geonames,
+  types::{Airport, Country, GeonamesCountry, FIR, UIR},
+};
+use crate::{
+  moving::controller::{Controller, Facility},
+  types::Point,
+};
 use log::error;
 use std::collections::HashMap;
 
@@ -16,6 +22,7 @@ pub struct FixedData {
   firs_icao_idx: HashMap<String, usize>,
   firs_prefix_idx: HashMap<String, usize>,
   uirs_idx: HashMap<String, usize>,
+  geonames: Geonames,
 }
 
 impl FixedData {
@@ -32,6 +39,7 @@ impl FixedData {
       firs_icao_idx: HashMap::new(),
       firs_prefix_idx: HashMap::new(),
       uirs_idx: HashMap::new(),
+      geonames: Geonames::empty(),
     }
   }
 
@@ -47,6 +55,7 @@ impl FixedData {
     self.firs_icao_idx = other.firs_icao_idx;
     self.firs_prefix_idx = other.firs_prefix_idx;
     self.uirs_idx = other.uirs_idx;
+    self.geonames = other.geonames;
   }
 
   pub fn new(
@@ -54,6 +63,7 @@ impl FixedData {
     airports: Vec<Airport>,
     firs: Vec<FIR>,
     uirs: Vec<UIR>,
+    geonames: Geonames,
   ) -> Self {
     let mut arpt_icao_idx: HashMap<String, Vec<usize>> = HashMap::new();
     let mut arpt_iata_idx: HashMap<String, usize> = HashMap::new();
@@ -103,6 +113,7 @@ impl FixedData {
       firs_icao_idx,
       firs_prefix_idx,
       uirs_idx,
+      geonames,
     }
   }
 
@@ -114,7 +125,7 @@ impl FixedData {
     &self.firs
   }
 
-  pub fn set_airport_controller(&mut self, ctrl: Controller) {
+  pub fn set_airport_controller(&mut self, ctrl: Controller) -> Option<&Airport> {
     let mut ctrl = ctrl;
     let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
@@ -141,6 +152,7 @@ impl FixedData {
           Facility::Approach => arpt.controllers.approach = Some(ctrl),
           _ => unreachable!(),
         }
+        return Some(arpt);
       } else {
         error!(
           "can't find airport for controller {} by index {}, this is deffy a bug",
@@ -150,6 +162,7 @@ impl FixedData {
     } else {
       error!("can't find airport for controller {}", ctrl.callsign);
     }
+    None
   }
 
   pub fn reset_airport_controller(&mut self, ctrl: &Controller) {
@@ -181,7 +194,7 @@ impl FixedData {
     }
   }
 
-  pub fn set_fir_controller(&mut self, ctrl: Controller) {
+  pub fn set_fir_controller(&mut self, ctrl: Controller) -> Option<FIR> {
     let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
     let country = self
@@ -190,6 +203,7 @@ impl FixedData {
       .map(|idx| self.countries.get(*idx).unwrap());
 
     let fir_ids = self.find_fir_indices(code);
+    let mut fir_found = None;
     for idx in fir_ids {
       let fir = self.firs.get_mut(idx);
       if let Some(fir) = fir {
@@ -207,8 +221,10 @@ impl FixedData {
         };
         // endregion:set_human_readable
         fir.controllers.insert(ctrl.callsign.clone(), ctrl);
+        fir_found = Some(fir.clone());
       }
     }
+    fir_found
   }
 
   pub fn reset_fir_controller(&mut self, ctrl: &Controller) {
@@ -304,5 +320,13 @@ impl FixedData {
     let idx = self.arpt_compound_idx.get(code)?;
     let arpt = self.airports.get(*idx)?;
     Some(arpt.clone())
+  }
+
+  pub fn get_geonames_country_by_position(&self, position: Point) -> Option<GeonamesCountry> {
+    self.geonames.get_country_by_position(position)
+  }
+
+  pub fn get_geonames_country_by_id(&self, id: &str) -> Option<GeonamesCountry> {
+    self.geonames.get_country_by_id(id)
   }
 }
