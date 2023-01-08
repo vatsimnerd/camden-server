@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
@@ -10,6 +12,20 @@ pub enum Facility {
   Tower = 4,
   Approach = 5,
   Radar = 6,
+}
+
+impl Display for Facility {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Facility::Reject => write!(f, "reject"),
+      Facility::ATIS => write!(f, "atis"),
+      Facility::Delivery => write!(f, "delivery"),
+      Facility::Ground => write!(f, "ground"),
+      Facility::Tower => write!(f, "tower"),
+      Facility::Approach => write!(f, "approach"),
+      Facility::Radar => write!(f, "radar"),
+    }
+  }
 }
 
 impl From<i8> for Facility {

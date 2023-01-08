@@ -304,17 +304,20 @@ impl Manager {
                   if let Some(fir) = fir {
                     let country = fir.country.as_ref();
                     if let Some(country) = country {
-                      ctrl_grouped.inc(country.geoname_id.clone());
+                      let key = format!("{}:radar", country.geoname_id);
+                      ctrl_grouped.inc(key);
                     }
                   }
                 }
                 _ => {
                   fresh_controllers.insert(ctrl.callsign.clone(), ctrl.clone());
+                  let facility = ctrl.facility.clone();
                   let arpt = fixed.set_airport_controller(ctrl);
                   if let Some(arpt) = arpt {
                     let country = arpt.country.as_ref();
                     if let Some(country) = country {
-                      ctrl_grouped.inc(country.geoname_id.clone());
+                      let key = format!("{}:{}", country.geoname_id, facility);
+                      ctrl_grouped.inc(key);
                     }
                   }
                 }
@@ -343,11 +346,14 @@ impl Manager {
               .set(labels!("object_type" = "controller"), process_time);
 
             let fixed = self.fixed.read().await;
-            for (geo_id, count) in ctrl_grouped.iter() {
-              let country = fixed.get_geonames_country_by_id(geo_id).unwrap();
+            for (key, count) in ctrl_grouped.iter() {
+              let tokens: Vec<&str> = key.split(":").collect();
+              let country = fixed.get_geonames_country_by_id(tokens[0]).unwrap();
+              let facility = tokens[1];
               metrics.vatsim_objects_online.set(
                 labels!(
                   "object_type" = "controller",
+                  "controller_type" = facility,
                   "country_code" = &country.iso,
                   "continent_code" = &country.continent
                 ),
