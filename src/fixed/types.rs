@@ -28,6 +28,8 @@ pub struct Airport {
   pub is_pseudo: bool,
   pub controllers: ControllerSet,
   pub runways: HashMap<String, Runway>,
+  #[serde(skip_serializing)]
+  pub country: Option<GeonamesCountry>,
 }
 
 impl Airport {
@@ -71,6 +73,8 @@ pub struct FIR {
   pub prefix: String,
   pub boundaries: Boundaries,
   pub controllers: HashMap<String, Controller>,
+  #[serde(skip_serializing)]
+  pub country: Option<GeonamesCountry>,
 }
 
 impl FIR {
@@ -105,7 +109,7 @@ impl PartialEq for Boundaries {
   }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct GeonamesCountry {
   pub iso: String,
   pub iso3: String,

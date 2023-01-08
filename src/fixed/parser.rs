@@ -108,18 +108,22 @@ fn parse(
               }
             }
 
+            let position = Point {
+              lat: lat.unwrap(),
+              lng: lng.unwrap(),
+            };
+            let country = geonames.get_country_by_position(position);
+
             let a = Airport {
               icao,
               iata: tokens[4].into(),
               name: tokens[1].into(),
-              position: Point {
-                lat: lat.unwrap(),
-                lng: lng.unwrap(),
-              },
+              position,
               fir_id: tokens[5].into(),
               is_pseudo: tokens[6] == "1",
               controllers: ControllerSet::empty(),
               runways,
+              country,
             };
 
             airports.push(a);
@@ -141,12 +145,14 @@ fn parse(
 
             let boundaries = bdrs.get(b_id);
             if let Some(boundaries) = boundaries {
+              let country = geonames.get_country_by_position(boundaries.center);
               let fir = FIR {
                 icao: tokens[0].into(),
                 name: tokens[1].into(),
                 prefix: tokens[2].into(),
                 boundaries: boundaries.clone(),
                 controllers: HashMap::new(),
+                country,
               };
               firs.push(fir);
             } else {
