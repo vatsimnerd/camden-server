@@ -18,8 +18,8 @@ use crate::{
     load_vatsim_data,
     pilot::Pilot,
   },
+  persistent::{Persistent, TrackPoint},
   seconds_since,
-  track::{TrackPoint, TrackStore},
   types::Point,
   util::Counter,
 };
@@ -42,7 +42,7 @@ pub struct Manager {
 
   airports2d: RwLock<RTree<PointObject>>,
   firs2d: RwLock<RTree<RectObject>>,
-  tracks: Option<RwLock<TrackStore>>,
+  db: Option<RwLock<Persistent>>,
 
   metrics: RwLock<Metrics>,
 }
@@ -51,26 +51,26 @@ impl Manager {
   pub async fn new(cfg: Config) -> Self {
     info!("setting vatsim data manager up");
 
-    let res = TrackStore::new(&cfg).await;
+    let res = Persistent::new(&cfg).await;
 
     if let Err(err) = &res {
       error!("error creating track store: {}", err)
     }
 
-    let tracks = res.ok().map(RwLock::new);
+    let persistent = res.ok().map(RwLock::new);
 
-    if let Some(tracks) = &tracks {
-      info!("creating track indices");
-      let tracks = tracks.write().await;
+    if let Some(persistent) = &persistent {
+      info!("creating database indices");
+      let persistent = persistent.write().await;
 
-      let res = tracks.indexes().await;
+      let res = persistent.indexes().await;
       if let Err(err) = res {
-        error!("error creating track indices: {}", err);
+        error!("error creating database indices: {}", err);
       }
 
       info!("cleaning up tracks");
       let t = Utc::now();
-      let res = tracks.cleanup().await;
+      let res = persistent.cleanup().await;
       if let Err(err) = res {
         error!("error cleaning up: {}", err);
       } else {
@@ -87,7 +87,7 @@ impl Manager {
       pilots_po: RwLock::new(HashMap::new()),
       airports2d: RwLock::new(RTree::new()),
       firs2d: RwLock::new(RTree::new()),
-      tracks,
+      db: persistent,
       metrics: RwLock::new(Metrics::new()),
     }
   }
@@ -222,8 +222,8 @@ impl Manager {
               let mut pilots = self.pilots.write().await;
 
               // tracking first, to avoid additional cloning while inserting into hashmap later
-              if let Some(tracks) = &self.tracks {
-                let res = tracks.write().await.store(&pilot).await;
+              if let Some(tracks) = &self.db {
+                let res = tracks.write().await.store_track(&pilot).await;
                 if let Err(err) = res {
                   error!("error storing pilot track: {}", err);
                 }
@@ -365,7 +365,7 @@ impl Manager {
           // endregion:controllers_processing
         }
 
-        if let Some(tracks) = &self.tracks {
+        if let Some(tracks) = &self.db {
           let t = Utc::now();
           let res = tracks.read().await.counters().await;
           let process_time = seconds_since(t);
@@ -417,7 +417,7 @@ impl Manager {
     &self,
     pilot: &Pilot,
   ) -> Result<Option<Vec<TrackPoint>>, mongodb::error::Error> {
-    if let Some(tracks) = &self.tracks {
+    if let Some(tracks) = &self.db {
       tracks.read().await.get_track_points(pilot).await
     } else {
       Ok(None)
