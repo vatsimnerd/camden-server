@@ -10,7 +10,7 @@ use rocket::futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
-pub struct TrackStore {
+pub struct Persistent {
   db: Database,
 }
 
@@ -48,7 +48,7 @@ impl TrackPoint {
   }
 }
 
-impl TrackStore {
+impl Persistent {
   pub async fn new(cfg: &Config) -> Result<Self, mongodb::error::Error> {
     let opts = ClientOptions::parse(&cfg.track.uri).await?;
     let client = Client::with_options(opts)?;
@@ -130,7 +130,7 @@ impl TrackStore {
     Ok(tp_count)
   }
 
-  pub async fn store(&self, pilot: &Pilot) -> Result<(), mongodb::error::Error> {
+  pub async fn store_track(&self, pilot: &Pilot) -> Result<(), mongodb::error::Error> {
     let now = DateTime::now();
     let coll: Collection<Track> = self.db.collection(Track::collection());
     let code = pilot.track_code();

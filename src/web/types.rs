@@ -6,7 +6,7 @@ use crate::{
     aircraft::Aircraft,
     pilot::{FlightPlan, Pilot},
   },
-  track::TrackPoint,
+  persistent::TrackPoint,
   types::Point,
 };
 
