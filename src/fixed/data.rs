@@ -194,7 +194,7 @@ impl FixedData {
     }
   }
 
-  pub fn set_fir_controller(&mut self, ctrl: Controller) {
+  pub fn set_fir_controller(&mut self, ctrl: Controller) -> Option<FIR> {
     let tokens: Vec<&str> = ctrl.callsign.split('_').collect();
     let code = tokens[0];
     let country = self
@@ -203,6 +203,7 @@ impl FixedData {
       .map(|idx| self.countries.get(*idx).unwrap());
 
     let fir_ids = self.find_fir_indices(code);
+    let mut fir_found = None;
     for idx in fir_ids {
       let fir = self.firs.get_mut(idx);
       if let Some(fir) = fir {
@@ -220,8 +221,10 @@ impl FixedData {
         };
         // endregion:set_human_readable
         fir.controllers.insert(ctrl.callsign.clone(), ctrl);
+        fir_found = Some(fir.clone());
       }
     }
+    fir_found
   }
 
   pub fn reset_fir_controller(&mut self, ctrl: &Controller) {

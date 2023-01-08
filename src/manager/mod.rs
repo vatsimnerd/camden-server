@@ -289,22 +289,38 @@ impl Manager {
           let t = Utc::now();
           let mut fresh_controllers = HashMap::new();
           let mut ccount = 0;
+          let mut ctrl_grouped = Counter::new();
+          {
+            let mut fixed = self.fixed.write().await;
 
-          for ctrl in data.controllers.into_iter() {
-            match &ctrl.facility {
-              Facility::Reject => {
-                continue;
+            for ctrl in data.controllers.into_iter() {
+              match &ctrl.facility {
+                Facility::Reject => {
+                  continue;
+                }
+                Facility::Radar => {
+                  fresh_controllers.insert(ctrl.callsign.clone(), ctrl.clone());
+                  let fir = fixed.set_fir_controller(ctrl);
+                  if let Some(fir) = fir {
+                    let country = fir.country.as_ref();
+                    if let Some(country) = country {
+                      ctrl_grouped.inc(country.geoname_id.clone());
+                    }
+                  }
+                }
+                _ => {
+                  fresh_controllers.insert(ctrl.callsign.clone(), ctrl.clone());
+                  let arpt = fixed.set_airport_controller(ctrl);
+                  if let Some(arpt) = arpt {
+                    let country = arpt.country.as_ref();
+                    if let Some(country) = country {
+                      ctrl_grouped.inc(country.geoname_id.clone());
+                    }
+                  }
+                }
               }
-              Facility::Radar => {
-                fresh_controllers.insert(ctrl.callsign.clone(), ctrl.clone());
-                self.fixed.write().await.set_fir_controller(ctrl)
-              }
-              _ => {
-                fresh_controllers.insert(ctrl.callsign.clone(), ctrl.clone());
-                self.fixed.write().await.set_airport_controller(ctrl);
-              }
+              ccount += 1;
             }
-            ccount += 1;
           }
 
           for (cs, ctrl) in controllers.iter() {
@@ -325,9 +341,19 @@ impl Manager {
             metrics
               .processing_time_sec
               .set(labels!("object_type" = "controller"), process_time);
-            metrics
-              .vatsim_objects_online
-              .set(labels!("object_type" = "controller"), controllers.len());
+
+            let fixed = self.fixed.read().await;
+            for (geo_id, count) in ctrl_grouped.iter() {
+              let country = fixed.get_geonames_country_by_id(geo_id).unwrap();
+              metrics.vatsim_objects_online.set(
+                labels!(
+                  "object_type" = "controller",
+                  "country_code" = &country.iso,
+                  "continent_code" = &country.continent
+                ),
+                *count,
+              );
+            }
           }
           info!("{} controllers processed in {}s", ccount, process_time);
           // endregion:controllers_processing
