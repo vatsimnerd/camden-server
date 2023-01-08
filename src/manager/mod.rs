@@ -9,9 +9,8 @@ use crate::{
   config::Config,
   fixed::{
     data::FixedData,
-    geonames::{load_countries, load_shapes},
     parser::load_fixed,
-    types::{Airport, GeonamesCountry, GeonamesShape, FIR},
+    types::{Airport, FIR},
   },
   labels,
   moving::{
@@ -22,9 +21,9 @@ use crate::{
   seconds_since,
   track::{TrackPoint, TrackStore},
   types::Point,
+  util::Counter,
 };
 use chrono::Utc;
-use geo::algorithm::Contains;
 use log::{debug, error, info};
 use rstar::{RTree, AABB};
 use std::collections::{HashMap, HashSet};
@@ -44,9 +43,6 @@ pub struct Manager {
   airports2d: RwLock<RTree<PointObject>>,
   firs2d: RwLock<RTree<RectObject>>,
   tracks: Option<RwLock<TrackStore>>,
-
-  gn_countries: RwLock<HashMap<String, GeonamesCountry>>,
-  gn_shapes: RwLock<RTree<GeonamesShape>>,
 
   metrics: RwLock<Metrics>,
 }
@@ -93,8 +89,6 @@ impl Manager {
       firs2d: RwLock::new(RTree::new()),
       tracks,
       metrics: RwLock::new(Metrics::new()),
-      gn_countries: RwLock::new(HashMap::new()),
-      gn_shapes: RwLock::new(RTree::new()),
     }
   }
 
@@ -179,48 +173,8 @@ impl Manager {
     }
   }
 
-  async fn setup_geonames_data(&self) -> Result<(), Box<dyn std::error::Error>> {
-    let t = Utc::now();
-    let geonames_countries = load_countries(&self.cfg).await?;
-    {
-      let mut gn = self.gn_countries.write().await;
-      for (k, v) in geonames_countries.into_iter() {
-        gn.insert(k, v);
-      }
-    }
-    debug!("geonames countries processed in {}s", seconds_since(t));
-
-    let t = Utc::now();
-    let geonames_shapes = load_shapes(&self.cfg).await?;
-    {
-      // consider bulk loading for better startup performance
-      let mut tree = self.gn_shapes.write().await;
-      for shape in geonames_shapes {
-        tree.insert(shape);
-      }
-    }
-    debug!("geonames shapes processed in {}s", seconds_since(t));
-    Ok(())
-  }
-
-  pub async fn search_country(&self, position: Point) -> Option<GeonamesCountry> {
-    let pcoord: geo_types::Point = position.into();
-    let envelope = AABB::from_point(pcoord);
-    let tree = self.gn_shapes.read().await;
-    let mut res = tree.locate_in_envelope_intersecting(&envelope);
-    let geo_id = res
-      .find(|gs| gs.poly.contains(&pcoord))
-      .map(|gs| &gs.ref_id);
-    if let Some(geo_id) = geo_id {
-      self.gn_countries.read().await.get(geo_id).cloned()
-    } else {
-      None
-    }
-  }
-
   pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
     self.setup_fixed_data().await?;
-    self.setup_geonames_data().await?;
 
     let mut pilots_callsigns = HashSet::new();
     let mut controllers: HashMap<String, Controller> = HashMap::new();
@@ -251,7 +205,7 @@ impl Manager {
           let t = Utc::now();
           let pcount = data.pilots.len();
 
-          let mut pilots_grouped = HashMap::new();
+          let mut pilots_grouped = Counter::new();
           {
             for pilot in data.pilots.into_iter() {
               // avoid duplication in rtree
@@ -275,10 +229,13 @@ impl Manager {
                 }
               }
 
-              let country = self.search_country(pilot.position).await;
+              let country = self
+                .fixed
+                .read()
+                .await
+                .get_geonames_country_by_position(pilot.position);
               if let Some(country) = country {
-                let counter = pilots_grouped.entry(country.geoname_id).or_insert(0);
-                *counter += 1;
+                pilots_grouped.inc(country.geoname_id);
               }
 
               // We have to keep point objects in both hashmap and rtree
@@ -307,20 +264,20 @@ impl Manager {
           let process_time = seconds_since(t);
           {
             let mut metrics = self.metrics.write().await;
-            let countries = self.gn_countries.read().await;
             metrics
               .processing_time_sec
               .set(labels!("object_type" = "pilot"), process_time);
 
-            for (geo_id, count) in pilots_grouped {
-              let country = countries.get(&geo_id).unwrap();
+            let fixed = self.fixed.read().await;
+            for (geo_id, count) in pilots_grouped.iter() {
+              let country = fixed.get_geonames_country_by_id(geo_id).unwrap();
               metrics.vatsim_objects_online.set(
                 labels!(
                   "object_type" = "pilot",
                   "country_code" = &country.iso,
                   "continent_code" = &country.continent
                 ),
-                count,
+                *count,
               );
             }
           }
@@ -332,6 +289,7 @@ impl Manager {
           let t = Utc::now();
           let mut fresh_controllers = HashMap::new();
           let mut ccount = 0;
+
           for ctrl in data.controllers.into_iter() {
             match &ctrl.facility {
               Facility::Reject => {

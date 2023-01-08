@@ -1,6 +1,7 @@
 use super::{
   boundaries::load_boundaries,
   data::FixedData,
+  geonames::Geonames,
   ourairports::{load_runways, Runway},
   types::{Airport, Boundaries, Country, FIR, UIR},
 };
@@ -32,6 +33,7 @@ fn parse(
   src: &str,
   bdrs: HashMap<String, Boundaries>,
   mut runway_map: HashMap<String, Vec<Runway>>,
+  geonames: Geonames,
 ) -> Result<FixedData, ParseError> {
   let mut state = ParserState::Idle;
   let mut countries = vec![];
@@ -173,13 +175,14 @@ fn parse(
     }
   }
 
-  Ok(FixedData::new(countries, airports, firs, uirs))
+  Ok(FixedData::new(countries, airports, firs, uirs, geonames))
 }
 
 pub async fn load_fixed(cfg: &Config) -> Result<FixedData, Box<dyn Error>> {
   let boundaries = load_boundaries(&cfg.fixed.boundaries_url).await?;
   let text = reqwest::get(&cfg.fixed.data_url).await?.text().await?;
   let runways = load_runways(cfg).await?;
-  let data = parse(&text, boundaries, runways)?;
+  let geonames = Geonames::load(cfg).await?;
+  let data = parse(&text, boundaries, runways, geonames)?;
   Ok(data)
 }
