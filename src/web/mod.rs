@@ -31,21 +31,23 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{select, time::interval};
 use uuid::Uuid;
 
+const MIN_ZOOM: f64 = 3.0;
+
 // use curl http://localhost:8000/api/updates/-3.0/49.5/5.0/63.0 for testing
-#[get("/updates/<min_lng>/<min_lat>/<max_lng>/<max_lat>?<query>")]
+#[get("/updates/<min_lng>/<min_lat>/<max_lng>/<max_lat>/<zoom>?<query>")]
 pub async fn updates(
   min_lng: f64,
   min_lat: f64,
   max_lng: f64,
   max_lat: f64,
+  zoom: f64,
   query: Option<String>,
   manager: &State<Arc<Manager>>,
   mut end: Shutdown,
 ) -> Result<EventStream![Event + '_], APIError> {
   let client_id = Uuid::new_v4().to_string()[..18].to_owned();
   info!(
-    "client {} connected with bbox [{}, {}, {}, {}]",
-    client_id, min_lng, min_lat, max_lng, max_lat
+    "client {client_id} connected with bbox [{min_lng}, {min_lat}, {max_lng}, {max_lat}] zoom {zoom}"
   );
   let mut tm = interval(Duration::from_secs(5));
 
@@ -59,6 +61,11 @@ pub async fn updates(
       lng: max_lng,
     },
   };
+  let no_bounds = zoom < MIN_ZOOM;
+  if no_bounds {
+    info!("client {client_id} no_bounds flag set to true");
+  }
+
   let env = rect
     .scale(manager.config().camden.map_win_multiplier)
     .envelope();
@@ -79,14 +86,20 @@ pub async fn updates(
 
   Ok(EventStream! {
     loop {
-      let msg = select! {
+      let messages = select! {
         _ = &mut end =>  {
           debug!("shutting down");
           break;
         },
         _ = &mut Box::pin(tm.tick()) => {
+          let mut messages = vec![];
+
           let t = Utc::now();
-          let mut pilots = manager.get_pilots(&env).await;
+          let mut pilots = if no_bounds {
+            manager.get_all_pilots().await
+          } else {
+            manager.get_pilots(&env).await
+          };
           debug!("[{}] {} pilots loaded in {}s", client_id, pilots.len(), seconds_since(t));
 
           if let Some(f) = f_expr.as_ref() {
@@ -97,40 +110,57 @@ pub async fn updates(
           let (pilots_set, pilots_delete) = calc::calc_pilots(&pilots, &mut pilots_state);
           debug!("[{}] {} pilots diff calculated in {}s, set={}/del={}", client_id, pilots.len(), seconds_since(t), pilots_set.len(), pilots_delete.len());
 
+          if pilots_set.len() > 100 {
+            for chunk in pilots_set.chunks(100) {
+              messages.push(UpdateMessage::pilots_set(&client_id, chunk.to_vec()));
+            }
+          } else {
+            messages.push(UpdateMessage::pilots_set(&client_id, pilots_set));
+          }
+
+          messages.push(UpdateMessage::pilots_delete(&client_id, pilots_delete));
+
           let t = Utc::now();
-          let airports = manager.get_airports(&env).await;
+          let airports = if no_bounds {
+            manager.get_all_airports().await
+          } else {
+            manager.get_airports(&env).await
+          };
           debug!("[{}] {} airports loaded in {}s", client_id, airports.len(), seconds_since(t));
           let t = Utc::now();
           let (arpts_set, arpts_delete) = calc::calc_airports(&airports, &mut airports_state);
           debug!("[{}] {} airports diff calculated in {}s, set={}/del={}", client_id, airports.len(), seconds_since(t), arpts_set.len(), arpts_delete.len());
 
+          messages.push(UpdateMessage::airports_set(&client_id, arpts_set));
+          messages.push(UpdateMessage::airports_delete(&client_id, arpts_delete));
+
           let t = Utc::now();
-          let firs = manager.get_firs(&env).await;
+          let firs = if no_bounds {
+            manager.get_all_firs().await
+          } else {
+            manager.get_firs(&env).await
+          };
+
           debug!("[{}] {} firs loaded in {}s", client_id, firs.len(), seconds_since(t));
           let t = Utc::now();
           let (firs_set, firs_delete) = calc::calc_firs(&firs, &mut firs_state);
           debug!("[{}] {} firs diff calculated in {}s, set={}/del={}", client_id, firs.len(), seconds_since(t), firs_set.len(), firs_delete.len());
 
-          UpdateMessage {
-            connection_id: client_id.clone(),
-            message_type: "update",
-            data: Update {
-              set: ObjectsSet {
-                pilots: pilots_set,
-                airports: arpts_set,
-                firs: firs_set,
-              },
-              delete: ObjectsSet {
-                pilots: pilots_delete,
-                airports: arpts_delete,
-                firs: firs_delete,
-              }
-            }
-          }
+          messages.push(UpdateMessage::firs_set(&client_id, firs_set));
+          messages.push(UpdateMessage::firs_delete(&client_id, firs_delete));
+
+          messages
         }
       };
-      if !msg.data.is_empty() {
-        yield Event::json(&msg);
+
+      if !messages.is_empty() {
+        debug!("[{}] generated {} messages", client_id, messages.len())
+      }
+
+      for msg in messages {
+        if !msg.data.is_empty() {
+          yield Event::json(&msg);
+        }
       }
     }
   })

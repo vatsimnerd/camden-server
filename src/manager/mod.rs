@@ -100,6 +100,31 @@ impl Manager {
     self.metrics.read().await.render()
   }
 
+  pub async fn get_all_pilots(&self) -> Vec<Pilot> {
+    let pilots_idx = self.pilots.read().await;
+    pilots_idx.values().cloned().collect()
+  }
+
+  pub async fn get_all_airports(&self) -> Vec<Airport> {
+    let fixed = self.fixed.read().await;
+    fixed
+      .airports()
+      .into_iter()
+      .filter(|arpt| !arpt.controllers.is_empty())
+      .cloned()
+      .collect()
+  }
+
+  pub async fn get_all_firs(&self) -> Vec<FIR> {
+    let fixed = self.fixed.read().await;
+    fixed
+      .firs()
+      .into_iter()
+      .filter(|fir| !fir.is_empty())
+      .cloned()
+      .collect()
+  }
+
   pub async fn get_pilots(&self, env: &AABB<Point>) -> Vec<Pilot> {
     let pilots2d = self.pilots2d.read().await;
     let pilots_idx = self.pilots.read().await;

@@ -25,3 +25,5 @@ dbname = "camden-dev"
 
 [cache]
 runways = "/tmp/runways.csv.cache"
+geonames_countries = "/tmp/geonames-countries.cache"
+geonames_shapes = "/tmp/geonames-shapes.cache"
