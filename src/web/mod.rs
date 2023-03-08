@@ -7,7 +7,7 @@ mod types;
 use self::{
   error::APIError,
   filter::compile_filter,
-  message::{ObjectsSet, Update, UpdateMessage},
+  message::UpdateMessage,
   types::{PilotApiResponse, QueryCheckOkResponse},
 };
 use crate::{
@@ -31,9 +31,11 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{select, time::interval};
 use uuid::Uuid;
 
+// if zoom is less than this, the map might be wrapped on screen, thus we
+// need to show all the objects without checking current user map boundaries
 const MIN_ZOOM: f64 = 3.0;
 
-// use curl http://localhost:8000/api/updates/-3.0/49.5/5.0/63.0 for testing
+// use curl http://localhost:8000/api/updates/-3.0/49.5/5.0/63.0/5 for testing
 #[get("/updates/<min_lng>/<min_lat>/<max_lng>/<max_lat>/<zoom>?<query>")]
 pub async fn updates(
   min_lng: f64,

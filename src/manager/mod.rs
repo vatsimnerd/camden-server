@@ -3,7 +3,7 @@ pub mod spatial;
 
 use self::{
   metrics::Metrics,
-  spatial::{PointObject, RectObject},
+  spatial::{split_envelope, PointObject, RectObject},
 };
 use crate::{
   config::Config,
@@ -130,10 +130,12 @@ impl Manager {
     let pilots_idx = self.pilots.read().await;
     let mut pilots = vec![];
 
-    for po in pilots2d.locate_in_envelope(env) {
-      let pilot = pilots_idx.get(&po.id);
-      if let Some(pilot) = pilot {
-        pilots.push(pilot.clone());
+    for env in split_envelope(env) {
+      for po in pilots2d.locate_in_envelope(&env) {
+        let pilot = pilots_idx.get(&po.id);
+        if let Some(pilot) = pilot {
+          pilots.push(pilot.clone());
+        }
       }
     }
     pilots
@@ -144,11 +146,13 @@ impl Manager {
     let fixed = self.fixed.read().await;
     let mut airports = vec![];
 
-    for po in airports2d.locate_in_envelope(env) {
-      let airport = fixed.find_airport_compound(&po.id);
-      if let Some(airport) = airport {
-        if !airport.controllers.is_empty() {
-          airports.push(airport)
+    for env in split_envelope(env) {
+      for po in airports2d.locate_in_envelope(&env) {
+        let airport = fixed.find_airport_compound(&po.id);
+        if let Some(airport) = airport {
+          if !airport.controllers.is_empty() {
+            airports.push(airport)
+          }
         }
       }
     }
@@ -160,10 +164,12 @@ impl Manager {
     let fixed = self.fixed.read().await;
     let mut firs = HashMap::new();
 
-    for po in firs2d.locate_in_envelope_intersecting(env) {
-      let fir_list = fixed.find_firs(&po.id);
-      for fir in fir_list.into_iter().filter(|f| !f.is_empty()) {
-        firs.insert(fir.icao.clone(), fir);
+    for env in split_envelope(env) {
+      for po in firs2d.locate_in_envelope_intersecting(&env) {
+        let fir_list = fixed.find_firs(&po.id);
+        for fir in fir_list.into_iter().filter(|f| !f.is_empty()) {
+          firs.insert(fir.icao.clone(), fir);
+        }
       }
     }
     firs.into_values().collect()
