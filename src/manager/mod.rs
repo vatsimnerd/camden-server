@@ -18,7 +18,7 @@ use crate::{
     load_vatsim_data,
     pilot::Pilot,
   },
-  persistent::{Persistent, TrackPoint},
+  persistent::{models::TrackPoint, Persistent},
   seconds_since,
   types::Rect,
   util::Counter,

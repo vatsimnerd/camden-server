@@ -1,51 +1,28 @@
+pub mod models;
+
+use std::fmt::Debug;
+
 use crate::{config::Config, moving::pilot::Pilot};
 use chrono::{Duration, Utc};
 use log::{error, info};
 use mongodb::{
-  bson::{doc, oid::ObjectId, DateTime},
+  bson::{doc, DateTime},
   options::{ClientOptions, FindOptions},
   Client, Collection, Database, IndexModel,
 };
 use rocket::futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 
+use self::models::{Track, TrackPoint, User};
+
 #[derive(Debug)]
 pub struct Persistent {
   db: Database,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Track {
-  pub _id: Option<ObjectId>,
-  pub code: String,
-  pub created_at: DateTime,
-}
-
-impl Track {
-  pub fn collection() -> &'static str {
-    "tracks"
-  }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TrackPoint {
-  #[serde(skip_serializing)]
-  pub _id: Option<ObjectId>,
-  #[serde(skip_serializing)]
-  pub track_id: ObjectId,
-
-  pub lat: f64,
-  pub lng: f64,
-  pub alt: i32,
-  pub hdg: i16,
-  pub gs: i32,
-  pub ts: i64,
-}
-
-impl TrackPoint {
-  pub fn collection() -> &'static str {
-    "track_points"
-  }
+pub trait Model<'de>: Debug + Serialize + Deserialize<'de> {
+  fn collection() -> &'static str;
+  fn indexdefs() -> Vec<IndexModel>;
 }
 
 impl Persistent {
@@ -58,29 +35,20 @@ impl Persistent {
 
   pub async fn indexes(&self) -> Result<(), mongodb::error::Error> {
     let coll: Collection<Track> = self.db.collection(Track::collection());
-    coll
-      .create_index(
-        IndexModel::builder()
-          .keys(doc! {
-            "code": 1
-          })
-          .build(),
-        None,
-      )
-      .await?;
+    for idxdef in Track::indexdefs() {
+      coll.create_index(idxdef, None).await?;
+    }
 
     let coll: Collection<TrackPoint> = self.db.collection(TrackPoint::collection());
-    coll
-      .create_index(
-        IndexModel::builder()
-          .keys(doc! {
-            "track_id": 1,
-            "ts": 1,
-          })
-          .build(),
-        None,
-      )
-      .await?;
+    for idxdef in TrackPoint::indexdefs() {
+      coll.create_index(idxdef, None).await?;
+    }
+
+    let coll: Collection<User> = self.db.collection(User::collection());
+    for idxdef in User::indexdefs() {
+      coll.create_index(idxdef, None).await?;
+    }
+
     Ok(())
   }
 
