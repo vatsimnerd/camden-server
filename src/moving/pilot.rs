@@ -25,7 +25,7 @@ pub struct Pilot {
   pub aircraft_type: Option<Vec<&'static Aircraft>>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct FlightPlan {
   pub flight_rules: String,
   pub aircraft: String,

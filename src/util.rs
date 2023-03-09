@@ -25,6 +25,12 @@ impl<T: Hash + Eq> Deref for Counter<T> {
   }
 }
 
+impl<T: Hash + Eq> Default for Counter<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 #[cfg(test)]
 pub mod tests {
   use super::*;

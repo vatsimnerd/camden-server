@@ -75,7 +75,7 @@ impl<T: Display + Clone + Default> Metric<T> {
   }
 
   pub fn render(&self) -> String {
-    if self.values.len() == 0 {
+    if self.values.is_empty() {
       return "".into();
     }
 
@@ -175,5 +175,11 @@ impl Metrics {
     metrics.push(metric.render());
 
     metrics.join("")
+  }
+}
+
+impl Default for Metrics {
+  fn default() -> Self {
+    Self::new()
   }
 }

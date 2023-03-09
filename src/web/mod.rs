@@ -37,6 +37,7 @@ const MIN_ZOOM: f64 = 3.0;
 
 // use curl http://localhost:8000/api/updates/-3.0/49.5/5.0/63.0/5 for testing
 #[get("/updates/<min_lng>/<min_lat>/<max_lng>/<max_lat>/<zoom>?<query>")]
+#[allow(clippy::too_many_arguments)]
 pub async fn updates(
   min_lng: f64,
   min_lat: f64,
@@ -68,10 +69,6 @@ pub async fn updates(
     info!("client {client_id} no_bounds flag set to true");
   }
 
-  let env = rect
-    .scale(manager.config().camden.map_win_multiplier)
-    .envelope();
-
   let mut pilots_state = HashMap::new();
   let mut airports_state = HashMap::new();
   let mut firs_state = HashMap::new();
@@ -86,6 +83,7 @@ pub async fn updates(
     }
   };
 
+  #[allow(clippy::manual_retain)]
   Ok(EventStream! {
     loop {
       let messages = select! {
@@ -100,7 +98,7 @@ pub async fn updates(
           let mut pilots = if no_bounds {
             manager.get_all_pilots().await
           } else {
-            manager.get_pilots(&env).await
+            manager.get_pilots(&rect).await
           };
           debug!("[{}] {} pilots loaded in {}s", client_id, pilots.len(), seconds_since(t));
 
@@ -126,7 +124,7 @@ pub async fn updates(
           let airports = if no_bounds {
             manager.get_all_airports().await
           } else {
-            manager.get_airports(&env).await
+            manager.get_airports(&rect).await
           };
           debug!("[{}] {} airports loaded in {}s", client_id, airports.len(), seconds_since(t));
           let t = Utc::now();
@@ -140,7 +138,7 @@ pub async fn updates(
           let firs = if no_bounds {
             manager.get_all_firs().await
           } else {
-            manager.get_firs(&env).await
+            manager.get_firs(&rect).await
           };
 
           debug!("[{}] {} firs loaded in {}s", client_id, firs.len(), seconds_since(t));

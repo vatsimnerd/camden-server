@@ -2,6 +2,9 @@ use geo_types::{Coord, Point as GeoPoint};
 use rstar::AABB;
 use serde::Serialize;
 
+const MAX_LNG: f64 = 179.9999;
+const MIN_LNG: f64 = -179.9999;
+
 #[derive(Debug, Serialize, Clone, Copy, PartialEq)]
 pub struct Point {
   pub lat: f64,
@@ -20,8 +23,8 @@ impl From<Point> for GeoPoint {
 impl Point {
   pub fn clamp(&self) -> Self {
     Self {
-      lat: self.lat.clamp(-90.0, 90.0),
-      lng: (self.lng + 180.0).rem_euclid(360.0) - 180.0,
+      lat: self.lat.clamp(-90.0, 90.0), // don't wrap lat, just clamp
+      lng: (self.lng + 180.0).rem_euclid(360.0) - 180.0, // make sure lng is wrapped to stay within -180..180
     }
   }
 
@@ -103,7 +106,92 @@ impl Rect {
     }
   }
 
-  pub fn envelope(&self) -> AABB<Point> {
-    AABB::from_corners(self.south_west, self.north_east)
+  pub fn envelopes(&self) -> Vec<AABB<Point>> {
+    // AABB does silly things when the leftmost point has a positive longitude
+    // and the rightmost one has a negative one. AABB simply swaps them in constructor,
+    // that's not the behaviour we need.
+    if self.south_west.lng > 0.0 && self.north_east.lng < 0.0 {
+      vec![
+        AABB::from_corners(
+          Point {
+            lat: self.south_west.lat,
+            lng: self.south_west.lng,
+          },
+          Point {
+            lat: self.north_east.lat,
+            lng: MAX_LNG,
+          },
+        ),
+        AABB::from_corners(
+          Point {
+            lat: self.south_west.lat,
+            lng: MIN_LNG,
+          },
+          Point {
+            lat: self.north_east.lat,
+            lng: self.north_east.lng,
+          },
+        ),
+      ]
+    } else {
+      vec![AABB::from_corners(self.south_west, self.north_east)]
+    }
+  }
+}
+
+#[cfg(test)]
+pub mod tests {
+  use super::*;
+
+  #[test]
+  fn test_rect_wrap() {
+    let rect = Rect::new(170.0, 0.0, -170.0, 10.0);
+    let envs = rect.envelopes();
+    assert_eq!(envs.len(), 2);
+
+    assert_eq!(
+      envs[0].lower(),
+      Point {
+        lat: 0.0,
+        lng: 170.0
+      }
+    );
+    assert_eq!(
+      envs[0].upper(),
+      Point {
+        lat: 10.0,
+        lng: MAX_LNG
+      }
+    );
+
+    assert_eq!(
+      envs[1].lower(),
+      Point {
+        lat: 0.0,
+        lng: MIN_LNG
+      }
+    );
+    assert_eq!(
+      envs[1].upper(),
+      Point {
+        lat: 10.0,
+        lng: -170.0
+      }
+    );
+  }
+
+  #[test]
+  fn test_nowrap() {
+    let rect = Rect::new(0.0, 0.0, 10.0, 10.0);
+    let envs = rect.envelopes();
+    assert_eq!(envs.len(), 1);
+    assert_eq!(envs[0].lower(), Point { lat: 0.0, lng: 0.0 });
+    assert_eq!(
+      envs[0].upper(),
+      Point {
+        lat: 10.0,
+        lng: 10.0
+      }
+    );
   }
 }

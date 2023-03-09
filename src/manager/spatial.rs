@@ -5,9 +5,6 @@ use crate::{
 };
 use rstar::{RTreeObject, AABB};
 
-const MAX_LNG: f64 = 179.9999;
-const MIN_LNG: f64 = -179.9999;
-
 #[derive(Debug, Clone)]
 pub struct PointObject {
   pub id: String,
@@ -75,36 +72,6 @@ impl From<&FIR> for RectObject {
 impl PartialEq for RectObject {
   fn eq(&self, other: &Self) -> bool {
     self.id == other.id
-  }
-}
-
-// split envelope into two if it's crossing the map's longitude wrap point
-pub fn split_envelope(env: &AABB<Point>) -> Vec<AABB<Point>> {
-  if env.lower().lng > 0.0 && env.upper().lng < 0.0 {
-    vec![
-      AABB::from_corners(
-        Point {
-          lat: env.lower().lat,
-          lng: env.lower().lng,
-        },
-        Point {
-          lat: env.upper().lat,
-          lng: MAX_LNG,
-        },
-      ),
-      AABB::from_corners(
-        Point {
-          lat: env.lower().lat,
-          lng: MIN_LNG,
-        },
-        Point {
-          lat: env.upper().lat,
-          lng: env.upper().lng,
-        },
-      ),
-    ]
-  } else {
-    vec![env.clone()]
   }
 }
 

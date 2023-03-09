@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub enum EngineType {
   Electric,
   Jet,
@@ -13,7 +13,7 @@ pub enum EngineType {
   Turboprop,
 }
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub enum AircraftType {
   Amphibian,
   Gyrocopter,
@@ -23,7 +23,7 @@ pub enum AircraftType {
   Tiltrotor,
 }
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Aircraft {
   pub name: &'static str,
   pub description: &'static str,

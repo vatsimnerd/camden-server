@@ -161,10 +161,7 @@ impl GeonamesShape {
       })
       .collect();
     let exterior = LineString::from(rings.swap_remove(0));
-    let interior: Vec<LineString> = rings
-      .into_iter()
-      .map(|cvec| LineString::from(cvec))
-      .collect();
+    let interior: Vec<LineString> = rings.into_iter().map(LineString::from).collect();
     let poly = Polygon::new(exterior, interior);
     Self {
       poly,
@@ -216,18 +213,18 @@ impl TryFrom<Feature> for GeonamesShapeSet {
             let gs = GeonamesShape::from_vec(geoname_id.to_owned(), poly);
             gss.push(gs);
           }
-          return Ok(Self::Multi(gss));
+          Ok(Self::Multi(gss))
         }
         Value::Polygon(poly) => {
-          let gs = GeonamesShape::from_vec(geoname_id.to_owned(), poly);
-          return Ok(Self::Single(gs));
+          let gs = GeonamesShape::from_vec(geoname_id, poly);
+          Ok(Self::Single(gs))
         }
         _ => unimplemented!(),
       }
     } else {
-      return Err(Self::Error {
+      Err(Self::Error {
         msg: "feature geometry is absent",
-      });
+      })
     }
   }
 }

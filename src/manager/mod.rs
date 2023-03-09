@@ -3,7 +3,7 @@ pub mod spatial;
 
 use self::{
   metrics::Metrics,
-  spatial::{split_envelope, PointObject, RectObject},
+  spatial::{PointObject, RectObject},
 };
 use crate::{
   config::Config,
@@ -20,12 +20,12 @@ use crate::{
   },
   persistent::{Persistent, TrackPoint},
   seconds_since,
-  types::Point,
+  types::Rect,
   util::Counter,
 };
 use chrono::Utc;
 use log::{debug, error, info};
-use rstar::{RTree, AABB};
+use rstar::RTree;
 use std::collections::{HashMap, HashSet};
 use tokio::{sync::RwLock, time::sleep};
 
@@ -109,7 +109,7 @@ impl Manager {
     let fixed = self.fixed.read().await;
     fixed
       .airports()
-      .into_iter()
+      .iter()
       .filter(|arpt| !arpt.controllers.is_empty())
       .cloned()
       .collect()
@@ -119,18 +119,18 @@ impl Manager {
     let fixed = self.fixed.read().await;
     fixed
       .firs()
-      .into_iter()
+      .iter()
       .filter(|fir| !fir.is_empty())
       .cloned()
       .collect()
   }
 
-  pub async fn get_pilots(&self, env: &AABB<Point>) -> Vec<Pilot> {
+  pub async fn get_pilots(&self, rect: &Rect) -> Vec<Pilot> {
     let pilots2d = self.pilots2d.read().await;
     let pilots_idx = self.pilots.read().await;
     let mut pilots = vec![];
 
-    for env in split_envelope(env) {
+    for env in rect.envelopes() {
       for po in pilots2d.locate_in_envelope(&env) {
         let pilot = pilots_idx.get(&po.id);
         if let Some(pilot) = pilot {
@@ -141,12 +141,12 @@ impl Manager {
     pilots
   }
 
-  pub async fn get_airports(&self, env: &AABB<Point>) -> Vec<Airport> {
+  pub async fn get_airports(&self, rect: &Rect) -> Vec<Airport> {
     let airports2d = self.airports2d.read().await;
     let fixed = self.fixed.read().await;
     let mut airports = vec![];
 
-    for env in split_envelope(env) {
+    for env in rect.envelopes() {
       for po in airports2d.locate_in_envelope(&env) {
         let airport = fixed.find_airport_compound(&po.id);
         if let Some(airport) = airport {
@@ -159,12 +159,12 @@ impl Manager {
     airports
   }
 
-  pub async fn get_firs(&self, env: &AABB<Point>) -> Vec<FIR> {
+  pub async fn get_firs(&self, rect: &Rect) -> Vec<FIR> {
     let firs2d = self.firs2d.read().await;
     let fixed = self.fixed.read().await;
     let mut firs = HashMap::new();
 
-    for env in split_envelope(env) {
+    for env in rect.envelopes() {
       for po in firs2d.locate_in_envelope_intersecting(&env) {
         let fir_list = fixed.find_firs(&po.id);
         for fir in fir_list.into_iter().filter(|f| !f.is_empty()) {
@@ -378,7 +378,7 @@ impl Manager {
 
             let fixed = self.fixed.read().await;
             for (key, count) in ctrl_grouped.iter() {
-              let tokens: Vec<&str> = key.split(":").collect();
+              let tokens: Vec<&str> = key.split(':').collect();
               let country = fixed.get_geonames_country_by_id(tokens[0]).unwrap();
               let facility = tokens[1];
               metrics.vatsim_objects_online.set(
