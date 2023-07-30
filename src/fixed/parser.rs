@@ -124,6 +124,7 @@ fn parse(
               controllers: ControllerSet::empty(),
               runways,
               country,
+              wx: None,
             };
 
             airports.push(a);

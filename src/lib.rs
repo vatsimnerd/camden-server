@@ -9,6 +9,7 @@ pub mod moving;
 pub mod persistent;
 pub mod types;
 pub mod util;
+pub mod weather;
 pub mod web;
 
 pub fn seconds_since(t: DateTime<Utc>) -> f32 {
