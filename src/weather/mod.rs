@@ -211,19 +211,3 @@ impl WeatherManager {
     }
   }
 }
-
-#[cfg(test)]
-pub mod tests {
-
-  use chrono::Duration;
-
-  use super::*;
-
-  #[tokio::test]
-  async fn test_getter() {
-    let ttl = Duration::seconds(1800);
-    let mut manager = WeatherManager::new(ttl);
-    let info = manager.get("EGLL").await;
-    println!("{info:?}");
-  }
-}

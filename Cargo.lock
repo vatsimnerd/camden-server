@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "camden"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "bson",
  "chrono",
