@@ -3,6 +3,7 @@ use crate::{
   atis::runways::{detect_arrivals, detect_departures, normalize_atis_text},
   moving::controller::{Controller, ControllerSet},
   types::Point,
+  weather::WeatherInfo,
 };
 use geo_types::Polygon;
 use geo_types::{geometry::Coord, LineString};
@@ -30,6 +31,7 @@ pub struct Airport {
   pub runways: HashMap<String, Runway>,
   #[serde(skip_serializing)]
   pub country: Option<GeonamesCountry>,
+  pub wx: Option<WeatherInfo>,
 }
 
 impl Airport {

@@ -22,8 +22,9 @@ use crate::{
   seconds_since,
   types::Rect,
   util::Counter,
+  weather::WeatherManager,
 };
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use log::{debug, error, info};
 use rstar::RTree;
 use std::collections::{HashMap, HashSet};
@@ -212,6 +213,9 @@ impl Manager {
     let mut data_updated_at = 0;
     let mut cleanup = CLEANUP_EVERY_X_ITER;
 
+    // TODO: configurable weather ttl
+    let mut wx_manager = WeatherManager::new(Duration::seconds(1800));
+
     loop {
       info!("loading vatsim data");
       let t = Utc::now();
@@ -321,6 +325,7 @@ impl Manager {
           let mut fresh_controllers = HashMap::new();
           let mut ccount = 0;
           let mut ctrl_grouped = Counter::new();
+          let mut controlled_arpt = HashSet::new();
           {
             let mut fixed = self.fixed.write().await;
 
@@ -345,6 +350,7 @@ impl Manager {
                   let facility = ctrl.facility.clone();
                   let arpt = fixed.set_airport_controller(ctrl);
                   if let Some(arpt) = arpt {
+                    controlled_arpt.insert(arpt.icao.clone());
                     let country = arpt.country.as_ref();
                     if let Some(country) = country {
                       let key = format!("{}:{}", country.geoname_id, facility);
@@ -354,6 +360,16 @@ impl Manager {
                 }
               }
               ccount += 1;
+            }
+
+            let locations: Vec<&str> = controlled_arpt.iter().map(|s| s.as_str()).collect();
+            wx_manager.preload(locations).await;
+
+            for icao in controlled_arpt.iter() {
+              let wx = wx_manager.get(icao).await;
+              if let Some(wx) = wx {
+                fixed.set_airport_weather(icao, wx);
+              }
             }
           }
 

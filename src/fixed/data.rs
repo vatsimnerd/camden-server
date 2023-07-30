@@ -5,6 +5,7 @@ use super::{
 use crate::{
   moving::controller::{Controller, Facility},
   types::Point,
+  weather::WeatherInfo,
 };
 use log::error;
 use std::collections::HashMap;
@@ -123,6 +124,16 @@ impl FixedData {
 
   pub fn firs(&self) -> &Vec<FIR> {
     &self.firs
+  }
+
+  pub fn set_airport_weather(&mut self, icao: &str, wx: WeatherInfo) {
+    let idx = self.find_airport_idx(icao);
+    if let Some(idx) = idx {
+      let arpt = self.airports.get_mut(idx);
+      if let Some(arpt) = arpt {
+        arpt.wx = Some(wx);
+      }
+    }
   }
 
   pub fn set_airport_controller(&mut self, ctrl: Controller) -> Option<&Airport> {
