@@ -1,6 +1,6 @@
 [package]
 name = "camden"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 repository = "https://github.com/vatsimnerd/camden-server"
 license-file = "https://github.com/vatsimnerd/camden-server/blob/main/LICENSE"

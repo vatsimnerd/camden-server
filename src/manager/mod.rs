@@ -27,7 +27,10 @@ use crate::{
 use chrono::{Duration, Utc};
 use log::{debug, error, info};
 use rstar::RTree;
-use std::collections::{HashMap, HashSet};
+use std::{
+  collections::{HashMap, HashSet},
+  sync::Arc,
+};
 use tokio::{sync::RwLock, time::sleep};
 
 const CLEANUP_EVERY_X_ITER: u8 = 5;
@@ -106,12 +109,12 @@ impl Manager {
     pilots_idx.values().cloned().collect()
   }
 
-  pub async fn get_all_airports(&self) -> Vec<Airport> {
+  pub async fn get_all_airports(&self, show_uncontrolled_wx: bool) -> Vec<Airport> {
     let fixed = self.fixed.read().await;
     fixed
       .airports()
       .iter()
-      .filter(|arpt| !arpt.controllers.is_empty())
+      .filter(|arpt| !arpt.controllers.is_empty() || (show_uncontrolled_wx && arpt.wx.is_some()))
       .cloned()
       .collect()
   }
@@ -142,7 +145,7 @@ impl Manager {
     pilots
   }
 
-  pub async fn get_airports(&self, rect: &Rect) -> Vec<Airport> {
+  pub async fn get_airports(&self, rect: &Rect, show_uncontrolled_wx: bool) -> Vec<Airport> {
     let airports2d = self.airports2d.read().await;
     let fixed = self.fixed.read().await;
     let mut airports = vec![];
@@ -151,7 +154,7 @@ impl Manager {
       for po in airports2d.locate_in_envelope(&env) {
         let airport = fixed.find_airport_compound(&po.id);
         if let Some(airport) = airport {
-          if !airport.controllers.is_empty() {
+          if !airport.controllers.is_empty() || (show_uncontrolled_wx && airport.wx.is_some()) {
             airports.push(airport)
           }
         }
@@ -214,7 +217,10 @@ impl Manager {
     let mut cleanup = CLEANUP_EVERY_X_ITER;
 
     // TODO: configurable weather ttl
-    let mut wx_manager = WeatherManager::new(Duration::seconds(1800));
+    let wx_manager = WeatherManager::new(Duration::seconds(1800));
+    let wx_manager = Arc::new(wx_manager);
+    let wx_move = wx_manager.clone();
+    tokio::spawn(async move { wx_move.run().await });
 
     loop {
       info!("loading vatsim data");

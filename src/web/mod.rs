@@ -36,7 +36,7 @@ use uuid::Uuid;
 const MIN_ZOOM: f64 = 3.0;
 
 // use curl http://localhost:8000/api/updates/-3.0/49.5/5.0/63.0/5 for testing
-#[get("/updates/<min_lng>/<min_lat>/<max_lng>/<max_lat>/<zoom>?<query>")]
+#[get("/updates/<min_lng>/<min_lat>/<max_lng>/<max_lat>/<zoom>?<query>&<show_wx>")]
 #[allow(clippy::too_many_arguments)]
 pub async fn updates(
   min_lng: f64,
@@ -45,6 +45,7 @@ pub async fn updates(
   max_lat: f64,
   zoom: f64,
   query: Option<String>,
+  show_wx: Option<bool>,
   manager: &State<Arc<Manager>>,
   mut end: Shutdown,
 ) -> Result<EventStream![Event + '_], APIError> {
@@ -53,6 +54,11 @@ pub async fn updates(
     "client {client_id} connected with bbox [{min_lng}, {min_lat}, {max_lng}, {max_lat}] zoom {zoom}"
   );
   let mut tm = interval(Duration::from_secs(5));
+
+  let show_wx = match show_wx {
+    Some(value) => value,
+    None => false,
+  };
 
   let rect = Rect {
     south_west: Point {
@@ -122,9 +128,9 @@ pub async fn updates(
 
           let t = Utc::now();
           let airports = if no_bounds {
-            manager.get_all_airports().await
+            manager.get_all_airports(show_wx).await
           } else {
-            manager.get_airports(&rect).await
+            manager.get_airports(&rect, show_wx).await
           };
           debug!("[{}] {} airports loaded in {}s", client_id, airports.len(), seconds_since(t));
           let t = Utc::now();
